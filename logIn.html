@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NGO Management System — Sign In</title>
+<style>
+  :root{
+    --navy:#05374D;
+    --navy-2:#072F42;
+    --teal:#028090;
+    --seafoam:#00A896;
+    --mint:#02C39A;
+    --ink:#12262B;
+    --muted:#5B7373;
+    --muted-2:#8FA6A6;
+    --bg:#F1F7F6;
+    --white:#FFFFFF;
+    --danger:#B3261E;
+    --danger-bg:#FCEEEC;
+    --ring: rgba(2,128,144,0.35);
+    --font-head: Cambria, "Times New Roman", Georgia, serif;
+    --font-body: Calibri, "Segoe UI", Arial, sans-serif;
+  }
+
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--ink);
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding: 24px;
+  }
+
+  .shell{
+    width:100%;
+    max-width: 1080px;
+    min-height: 640px;
+    background: var(--white);
+    border-radius: 20px;
+    box-shadow: 0 30px 60px -20px rgba(5,55,77,0.35), 0 4px 16px rgba(5,55,77,0.08);
+    display:flex;
+    flex-direction:row;
+    overflow:hidden;
+  }
+
+  /* ---------------- Left brand / transparency panel ---------------- */
+  .brand{
+    position:relative;
+    flex: 1.05 1 0;
+    min-width: 0;
+    background: linear-gradient(165deg, var(--navy) 0%, var(--navy-2) 60%, #062A3A 100%);
+    color: var(--white);
+    padding: 48px 44px;
+    display:flex;
+    flex-direction:column;
+    justify-content:space-between;
+    overflow:hidden;
+  }
+
+  .brand::before{
+    content:"";
+    position:absolute;
+    width: 340px; height:340px;
+    border-radius:50%;
+    background: radial-gradient(circle at 30% 30%, rgba(0,168,150,0.55), rgba(0,168,150,0) 70%);
+    top:-140px; right:-120px;
+  }
+  .brand::after{
+    content:"";
+    position:absolute;
+    width: 260px; height:260px;
+    border-radius:50%;
+    background: radial-gradient(circle at 60% 60%, rgba(2,195,154,0.35), rgba(2,195,154,0) 70%);
+    bottom:-110px; left:-90px;
+  }
+
+  .brand-top{ position:relative; z-index:2; }
+
+  .brand-mark{
+    display:flex; align-items:center; gap:12px;
+    margin-bottom: 40px;
+  }
+  .brand-mark .glyph{
+    width:40px; height:40px; border-radius:11px;
+    background: var(--teal);
+    display:flex; align-items:center; justify-content:center;
+    flex-shrink:0;
+  }
+  .brand-mark .glyph svg{ width:22px; height:22px; }
+  .brand-mark span{
+    font-family: var(--font-head);
+    font-size: 18px;
+    font-weight:700;
+    letter-spacing: 0.2px;
+  }
+
+  .brand-eyebrow{
+    font-size: 11.5px;
+    font-weight:700;
+    letter-spacing: 2.5px;
+    color: var(--mint);
+    text-transform: uppercase;
+    margin: 0 0 14px 0;
+  }
+  .brand h1{
+    font-family: var(--font-head);
+    font-size: 34px;
+    line-height:1.22;
+    margin: 0 0 16px 0;
+    font-weight: 700;
+    max-width: 380px;
+  }
+  .brand p.lede{
+    font-size: 14.5px;
+    line-height:1.6;
+    color: #CFE3E0;
+    max-width: 360px;
+    margin:0;
+  }
+
+  /* Transparency snapshot — signature element */
+  .snapshot{
+    position:relative; z-index:2;
+    margin-top: 36px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 14px;
+    padding: 18px 20px;
+    backdrop-filter: blur(2px);
+  }
+  .snapshot-head{
+    display:flex; align-items:center; gap:8px;
+    margin-bottom: 14px;
+  }
+  .snapshot-dot{
+    width:7px; height:7px; border-radius:50%;
+    background: var(--mint);
+    box-shadow: 0 0 0 0 rgba(2,195,154,0.6);
+    animation: pulse 2.2s infinite;
+  }
+  @keyframes pulse{
+    0%{ box-shadow: 0 0 0 0 rgba(2,195,154,0.55); }
+    70%{ box-shadow: 0 0 0 8px rgba(2,195,154,0); }
+    100%{ box-shadow: 0 0 0 0 rgba(2,195,154,0); }
+  }
+  .snapshot-head span{
+    font-size: 11px; font-weight:700; letter-spacing:1.6px;
+    text-transform:uppercase; color:#AFC9C6;
+  }
+  .snapshot-grid{
+    display:grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+  }
+  .stat b{
+    display:block;
+    font-family: var(--font-head);
+    font-size: 21px;
+    color:#fff;
+    font-variant-numeric: tabular-nums;
+  }
+  .stat span{
+    display:block;
+    font-size: 10.5px;
+    color:#9FC0BC;
+    margin-top:2px;
+    line-height:1.3;
+  }
+
+  .brand-foot{
+    position:relative; z-index:2;
+    display:flex;
+    gap: 22px;
+    margin-top: 34px;
+    font-size: 12px;
+    color:#9FC0BC;
+  }
+  .brand-foot div{ display:flex; align-items:center; gap:6px; }
+  .brand-foot svg{ width:14px; height:14px; flex-shrink:0; }
+
+  /* ---------------- Right auth panel ---------------- */
+  .auth{
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 48px 46px;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    position:relative;
+  }
+  .auth-inner{ width:100%; max-width: 360px; margin: 0 auto; }
+
+  .auth h2{
+    font-family: var(--font-head);
+    font-size: 25px;
+    margin: 0 0 6px 0;
+    color: var(--navy);
+  }
+  .auth p.sub{
+    margin:0 0 22px 0;
+    font-size: 13.5px;
+    color: var(--muted);
+    line-height:1.5;
+  }
+
+  /* role pills */
+  .role-label{
+    font-size: 11.5px;
+    font-weight:700;
+    letter-spacing:1.2px;
+    text-transform:uppercase;
+    color: var(--muted);
+    margin-bottom:8px;
+    display:block;
+  }
+  .roles{
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px;
+    margin-bottom: 20px;
+  }
+  .role-pill{
+    border:1px solid #DCE9E7;
+    background: var(--bg);
+    color: var(--muted);
+    font-family: var(--font-body);
+    font-size: 12px;
+    font-weight:600;
+    padding: 7px 12px;
+    border-radius: 999px;
+    cursor:pointer;
+    transition: all .15s ease;
+  }
+  .role-pill:hover{ border-color: var(--seafoam); color: var(--teal); }
+  .role-pill.active{
+    background: var(--teal);
+    border-color: var(--teal);
+    color: #fff;
+  }
+  .role-pill:focus-visible, .field input:focus-visible, .btn-primary:focus-visible,
+  .icon-btn:focus-visible, .checkbox input:focus-visible + .box, .link:focus-visible{
+    outline: 3px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  form{ display:flex; flex-direction:column; gap: 16px; }
+
+  .field{ display:flex; flex-direction:column; gap:6px; }
+  .field label{
+    font-size: 12.5px;
+    font-weight:700;
+    color: var(--navy);
+  }
+  .input-wrap{ position:relative; }
+  .field input{
+    width:100%;
+    padding: 12px 14px;
+    font-size: 14px;
+    font-family: var(--font-body);
+    border: 1.5px solid #DDE9E7;
+    border-radius: 10px;
+    background: #FBFDFD;
+    color: var(--ink);
+    transition: border-color .15s ease, background .15s ease;
+  }
+  .field input::placeholder{ color: var(--muted-2); }
+  .field input:focus{
+    border-color: var(--teal);
+    background: #fff;
+    outline:none;
+  }
+  .field.has-error input{
+    border-color: var(--danger);
+    background: var(--danger-bg);
+  }
+  .error-msg{
+    font-size: 11.5px;
+    color: var(--danger);
+    min-height: 14px;
+    display:none;
+  }
+  .field.has-error .error-msg{ display:block; }
+
+  .icon-btn{
+    position:absolute;
+    right:8px; top:50%; transform:translateY(-50%);
+    background:none; border:none; cursor:pointer;
+    width:30px; height:30px;
+    display:flex; align-items:center; justify-content:center;
+    border-radius:8px;
+    color: var(--muted);
+  }
+  .icon-btn:hover{ color: var(--teal); background: var(--bg); }
+  .icon-btn svg{ width:18px; height:18px; }
+
+  .row-between{
+    display:flex; align-items:center; justify-content:space-between;
+    margin-top: -4px;
+  }
+  .checkbox{
+    display:flex; align-items:center; gap:8px;
+    font-size: 12.5px; color: var(--muted);
+    cursor:pointer; user-select:none;
+  }
+  .checkbox input{ position:absolute; opacity:0; width:16px; height:16px; }
+  .checkbox .box{
+    width:16px; height:16px; border-radius:5px;
+    border:1.5px solid #C9DBD8;
+    background:#fff;
+    display:inline-flex; align-items:center; justify-content:center;
+    transition: all .15s ease;
+    flex-shrink:0;
+  }
+  .checkbox input:checked + .box{
+    background: var(--teal); border-color: var(--teal);
+  }
+  .checkbox .box svg{ width:11px; height:11px; opacity:0; transition:opacity .1s; }
+  .checkbox input:checked + .box svg{ opacity:1; }
+
+  .link{
+    font-size: 12.5px;
+    color: var(--teal);
+    font-weight:700;
+    text-decoration:none;
+    background:none; border:none; cursor:pointer;
+    padding:2px;
+  }
+  .link:hover{ color: var(--navy); text-decoration:underline; }
+
+  .btn-primary{
+    margin-top: 4px;
+    width:100%;
+    padding: 13px 16px;
+    background: var(--teal);
+    color:#fff;
+    border:none;
+    border-radius: 10px;
+    font-family: var(--font-body);
+    font-size: 14.5px;
+    font-weight:700;
+    letter-spacing:0.2px;
+    cursor:pointer;
+    display:flex; align-items:center; justify-content:center; gap:10px;
+    transition: background .15s ease, transform .05s ease;
+  }
+  .btn-primary:hover{ background: #026a77; }
+  .btn-primary:active{ transform: translateY(1px); }
+  .btn-primary:disabled{ opacity:0.85; cursor:progress; }
+
+  .spinner{
+    width:16px; height:16px;
+    border-radius:50%;
+    border: 2.5px solid rgba(255,255,255,0.35);
+    border-top-color:#fff;
+    animation: spin .7s linear infinite;
+    display:none;
+  }
+  @keyframes spin{ to{ transform: rotate(360deg); } }
+  .btn-primary.loading .spinner{ display:inline-block; }
+  .btn-primary.loading .btn-label{ opacity:0.85; }
+
+  .divider{
+    display:flex; align-items:center; gap:12px;
+    margin: 20px 0 4px 0;
+    color: var(--muted-2);
+    font-size: 11.5px;
+  }
+  .divider::before, .divider::after{
+    content:""; flex:1; height:1px; background:#E4EEEC;
+  }
+
+  .hint{
+    margin-top: 14px;
+    font-size: 11.5px;
+    color: var(--muted);
+    background: var(--bg);
+    border-radius: 10px;
+    padding: 10px 12px;
+    line-height:1.5;
+  }
+  .hint b{ color: var(--navy); }
+
+  .signup{
+    margin-top: 22px;
+    text-align:center;
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  /* ---------------- Success overlay ---------------- */
+  .success-overlay{
+    position:absolute; inset:0;
+    background: rgba(255,255,255,0.97);
+    display:none;
+    align-items:center; justify-content:center;
+    flex-direction:column;
+    text-align:center;
+    padding: 40px;
+  }
+  .success-overlay.show{ display:flex; }
+  .success-check{
+    width:64px; height:64px; border-radius:50%;
+    background: var(--mint);
+    display:flex; align-items:center; justify-content:center;
+    margin-bottom: 18px;
+    animation: pop .35s ease;
+  }
+  @keyframes pop{ from{ transform:scale(0.6); opacity:0; } to{ transform:scale(1); opacity:1; } }
+  .success-check svg{ width:30px; height:30px; color:#fff; }
+  .success-overlay h3{
+    font-family: var(--font-head);
+    font-size: 21px;
+    color: var(--navy);
+    margin: 0 0 6px 0;
+  }
+  .success-overlay p{
+    font-size: 13.5px;
+    color: var(--muted);
+    margin: 0 0 4px 0;
+    max-width: 300px;
+  }
+
+  /* screen-reader only live region */
+  .sr-only{
+    position:absolute; width:1px; height:1px;
+    padding:0; margin:-1px; overflow:hidden;
+    clip:rect(0,0,0,0); white-space:nowrap; border:0;
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .snapshot-dot, .spinner, .success-check{ animation:none; }
+  }
+
+  /* ---------------- Responsive ---------------- */
+  @media (max-width: 860px){
+    .shell{ flex-direction: column; min-height:auto; }
+    .brand{ padding: 36px 30px; }
+    .brand h1{ font-size: 26px; max-width:none; }
+    .snapshot{ margin-top:24px; }
+    .brand-foot{ flex-wrap:wrap; row-gap:8px; margin-top:24px; }
+    .auth{ padding: 36px 28px 40px; }
+  }
+  @media (max-width: 420px){
+    body{ padding:0; }
+    .shell{ border-radius:0; box-shadow:none; }
+    .snapshot-grid{ grid-template-columns: repeat(3,1fr); }
+    .stat b{ font-size:17px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+  <!-- ================= LEFT: BRAND / TRANSPARENCY PANEL ================= -->
+  <aside class="brand">
+    <div class="brand-top">
+      <div class="brand-mark">
+        <span class="glyph">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 21s-7.5-4.6-10-9.3C0.3 8.1 2 4.5 5.4 4c2-.3 3.7.6 4.9 2.1L12 8l1.7-1.9C15 4.6 16.7 3.7 18.6 4c3.4.5 5.1 4.1 3.4 7.7C19.5 16.4 12 21 12 21z" fill="#fff"/>
+          </svg>
+        </span>
+        <span>NGO Management System</span>
+      </div>
+
+      <p class="brand-eyebrow">Secure Access Portal</p>
+      <h1>One login. Every mission,&nbsp;visible.</h1>
+      <p class="lede">Sign in to coordinate volunteers, process donations, and keep your organization's finances open to the people who trust it.</p>
+    </div>
+
+    <div class="snapshot">
+      <div class="snapshot-head">
+        <span class="snapshot-dot"></span>
+        <span>Live transparency snapshot</span>
+      </div>
+      <div class="snapshot-grid">
+        <div class="stat"><b>₹18.4L</b><span>Raised this quarter</span></div>
+        <div class="stat"><b>312</b><span>Active volunteers</span></div>
+        <div class="stat"><b>1,204</b><span>Beneficiaries aided</span></div>
+      </div>
+    </div>
+
+    <div class="brand-foot">
+      <div>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 3 6v6c0 5 3.8 8.7 9 10 5.2-1.3 9-5 9-10V6l-9-4Z"/></svg>
+        Role-based access
+      </div>
+      <div>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+        Bcrypt + HTTPS
+      </div>
+      <div>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+        99.9% uptime
+      </div>
+    </div>
+  </aside>
+
+  <!-- ================= RIGHT: AUTH FORM ================= -->
+  <section class="auth">
+    <div class="auth-inner">
+
+      <h2 id="formTitle">Welcome back</h2>
+      <p class="sub" id="formSub">Sign in to your Public Visitor account to continue.</p>
+
+      <span class="role-label">I am signing in as</span>
+      <div class="roles" role="tablist" aria-label="Select account role">
+        <button type="button" class="role-pill" data-role="Super Admin" role="tab">Super Admin</button>
+        <button type="button" class="role-pill" data-role="Project Manager" role="tab">Project Manager</button>
+        <button type="button" class="role-pill" data-role="Volunteer" role="tab">Volunteer</button>
+        <button type="button" class="role-pill" data-role="Donor" role="tab">Donor</button>
+        <button type="button" class="role-pill active" data-role="Public Visitor" role="tab" aria-selected="true">Public Visitor</button>
+      </div>
+
+      <form id="loginForm" novalidate>
+        <div class="field" id="emailField">
+          <label for="email">Email address</label>
+          <div class="input-wrap">
+            <input type="text" id="email" name="email" placeholder="you@organization.org" autocomplete="username" />
+          </div>
+          <span class="error-msg" id="emailError">Enter a valid email address.</span>
+        </div>
+
+        <div class="field" id="passwordField">
+          <label for="password">Password</label>
+          <div class="input-wrap">
+            <input type="password" id="password" name="password" placeholder="Enter your password" autocomplete="current-password" />
+            <button type="button" class="icon-btn" id="togglePassword" aria-label="Show password">
+              <svg id="eyeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"/>
+                <circle cx="12" cy="12" r="3"/>
+              </svg>
+            </button>
+          </div>
+          <span class="error-msg" id="passwordError">Password must be at least 6 characters.</span>
+        </div>
+
+        <div class="row-between">
+          <label class="checkbox">
+            <input type="checkbox" id="remember" />
+            <span class="box">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+            </span>
+            Remember me
+          </label>
+          <button type="button" class="link" id="forgotBtn">Forgot password?</button>
+        </div>
+
+        <button type="submit" class="btn-primary" id="submitBtn">
+          <span class="spinner"></span>
+          <span class="btn-label" id="submitLabel">Sign in as Public Visitor</span>
+        </button>
+
+        <p class="sr-only" id="liveRegion" aria-live="polite"></p>
+      </form>
+
+      <div class="hint" id="demoHint">
+        <b>Demo mode:</b> this form runs client-side only. Use any email and a password of 6+ characters to sign in.
+      </div>
+
+      <p class="signup">New to the platform? <button type="button" class="link" id="requestAccess">Request access</button></p>
+    </div>
+
+    <!-- Success state -->
+    <div class="success-overlay" id="successOverlay">
+      <div class="success-check">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+      </div>
+      <h3>You're signed in</h3>
+      <p id="successText">Redirecting to the Public Visitor dashboard…</p>
+      <button type="button" class="link" id="backToForm" style="margin-top:14px;">Back to sign in</button>
+    </div>
+  </section>
+
+</div>
+
+<script>
+(function(){
+  const roleButtons = document.querySelectorAll('.role-pill');
+  const formTitle = document.getElementById('formTitle');
+  const formSub = document.getElementById('formSub');
+  const submitLabel = document.getElementById('submitLabel');
+  const demoHint = document.getElementById('demoHint');
+  const successText = document.getElementById('successText');
+  const liveRegion = document.getElementById('liveRegion');
+
+  const roleCopy = {
+    "Super Admin": "Sign in to your Super Admin account to manage the full system.",
+    "Project Manager": "Sign in to your Project Manager account to run campaigns and tasks.",
+    "Volunteer": "Sign in to your Volunteer account to view assignments and log hours.",
+    "Donor": "Sign in to your Donor account to manage giving and receipts.",
+    "Public Visitor": "Sign in to your Public Visitor account to continue."
+  };
+
+  let currentRole = "Public Visitor";
+
+  roleButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      roleButtons.forEach(b => { b.classList.remove('active'); b.setAttribute('aria-selected','false'); });
+      btn.classList.add('active');
+      btn.setAttribute('aria-selected','true');
+      currentRole = btn.dataset.role;
+      formTitle.textContent = currentRole === "Public Visitor" ? "Welcome back" : `${currentRole} sign in`;
+      formSub.textContent = roleCopy[currentRole];
+      submitLabel.textContent = `Sign in as ${currentRole}`;
+      liveRegion.textContent = `Role set to ${currentRole}`;
+    });
+  });
+
+  // Password visibility toggle
+  const pwInput = document.getElementById('password');
+  const toggleBtn = document.getElementById('togglePassword');
+  const eyeIcon = document.getElementById('eyeIcon');
+  toggleBtn.addEventListener('click', () => {
+    const isHidden = pwInput.type === 'password';
+    pwInput.type = isHidden ? 'text' : 'password';
+    toggleBtn.setAttribute('aria-label', isHidden ? 'Hide password' : 'Show password');
+    eyeIcon.innerHTML = isHidden
+      ? '<path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a21.4 21.4 0 0 1 5.06-5.94M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 7 11 7a21.4 21.4 0 0 1-3.54 4.5M14.12 14.12a3 3 0 1 1-4.24-4.24"/><path d="M1 1l22 22"/>'
+      : '<path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"/><circle cx="12" cy="12" r="3"/>';
+  });
+
+  // Validation helpers
+  const emailField = document.getElementById('emailField');
+  const emailInput = document.getElementById('email');
+  const passwordField = document.getElementById('passwordField');
+
+  function isValidEmail(v){
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
+  }
+
+  function setError(field, hasError){
+    field.classList.toggle('has-error', hasError);
+  }
+
+  emailInput.addEventListener('input', () => {
+    if (emailField.classList.contains('has-error') && isValidEmail(emailInput.value)) {
+      setError(emailField, false);
+    }
+  });
+  pwInput.addEventListener('input', () => {
+    if (passwordField.classList.contains('has-error') && pwInput.value.length >= 6) {
+      setError(passwordField, false);
+    }
+  });
+
+  // Forgot password + request access — lightweight inline feedback, no browser alert()
+  function flashHint(message){
+    const original = demoHint.innerHTML;
+    demoHint.innerHTML = '<b>' + message + '</b>';
+    demoHint.style.background = '#E8F6F3';
+    setTimeout(() => {
+      demoHint.innerHTML = original;
+      demoHint.style.background = '';
+    }, 2800);
+  }
+  document.getElementById('forgotBtn').addEventListener('click', () => {
+    flashHint('If an account exists for that email, a reset link has been sent.');
+  });
+  document.getElementById('requestAccess').addEventListener('click', () => {
+    flashHint('Access requests are reviewed by your Super Admin. Contact your NGO coordinator.');
+  });
+
+  // Submit handling
+  const form = document.getElementById('loginForm');
+  const submitBtn = document.getElementById('submitBtn');
+  const successOverlay = document.getElementById('successOverlay');
+
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+
+    const emailOk = isValidEmail(emailInput.value);
+    const pwOk = pwInput.value.length >= 6;
+
+    setError(emailField, !emailOk);
+    setError(passwordField, !pwOk);
+
+    if (!emailOk) { emailInput.focus(); }
+    else if (!pwOk) { pwInput.focus(); }
+
+    if (!emailOk || !pwOk) {
+      liveRegion.textContent = 'Please fix the highlighted fields.';
+      return;
+    }
+
+    submitBtn.classList.add('loading');
+    submitBtn.disabled = true;
+    liveRegion.textContent = 'Signing in…';
+
+    setTimeout(() => {
+      submitBtn.classList.remove('loading');
+      submitBtn.disabled = false;
+      successText.textContent = `Redirecting to the ${currentRole} dashboard…`;
+      successOverlay.classList.add('show');
+      liveRegion.textContent = `Signed in as ${currentRole}.`;
+    }, 1100);
+  });
+
+  document.getElementById('backToForm').addEventListener('click', () => {
+    successOverlay.classList.remove('show');
+    form.reset();
+    setError(emailField, false);
+    setError(passwordField, false);
+  });
+})();
+</script>
+
+</body>
+</html>
