@@ -1,212 +1,206 @@
 /**
- * NGO Management System — Auth + Volunteer Management
- * -----------------------------------------------------
- * One file: Express server, CSV-backed storage, and every page's
- * HTML/CSS/JS templated inline below.
+ * NGO Management System — Auth + Volunteer Management + Beneficiary Management
+ * -------------------------------------------------------------------------
+ * One file for application logic: Express server, and every page's
+ * HTML/CSS/JS templated inline below. Storage lives in PostgreSQL —
+ * see db.js (connection + auto-migration) and schema.sql (table definitions).
  *
  * Run it:
  *   npm install
  *   node app.js
  *   open http://localhost:3000/login
  *
- * Modules in this file:
- *   1. CSV STORE      — generic CSV table helper + Users/Volunteers/Hours tables
- *   2. SHARED CSS      — one stylesheet, reused by every page
- *   3. PAGE TEMPLATES  — functions returning full HTML strings
- *   4. MIDDLEWARE       — session auth + role guards
- *   5. APP / ROUTES    — Auth routes, then Volunteer Management routes
+ * (First-time setup — create the database once: see README.md)
  *
- * When the system moves to a real database, only section 1 changes.
+ * Modules in this file:
+ *   1. DATABASE         — query functions built on db.js / schema.sql
+ *   2. SHARED CSS        — one stylesheet, reused by every page
+ *   3. PAGE TEMPLATES    — functions returning full HTML strings
+ *   4. MIDDLEWARE        — session auth + role guards
+ *   5. APP / ROUTES      — Auth, Volunteer Management, Beneficiary Management
  */
 
 const express = require("express");
 const session = require("express-session");
 const bcrypt = require("bcryptjs");
-const crypto = require("crypto");
-const fs = require("fs");
-const path = require("path");
+const { query, ensureSchema } = require("./db");
 
 const PORT = process.env.PORT || 3000;
 const VALID_ROLES = ["Super Admin", "Project Manager", "Volunteer", "Donor", "Public Visitor"];
 
 /* ============================================================
-   1. CSV STORE — swap this section for a real database later
+   1. DATABASE — all SQL lives here. Swap this section again later
+      (e.g. add caching, a different driver) without touching routes.
    ============================================================ */
 
-const DATA_DIR = path.join(__dirname, "data");
-
-function csvEscape(value) {
-  const str = String(value ?? "");
-  return /[",\n]/.test(str) ? '"' + str.replace(/"/g, '""') + '"' : str;
-}
-
-function csvParseLine(line) {
-  const fields = [];
-  let cur = "";
-  let inQuotes = false;
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i];
-    if (inQuotes) {
-      if (ch === '"') {
-        if (line[i + 1] === '"') { cur += '"'; i++; } else { inQuotes = false; }
-      } else {
-        cur += ch;
-      }
-    } else if (ch === '"') {
-      inQuotes = true;
-    } else if (ch === ",") {
-      fields.push(cur); cur = "";
-    } else {
-      cur += ch;
-    }
-  }
-  fields.push(cur);
-  return fields;
-}
-
-// A generic CSV-backed "table" — readAll / appendRow / writeAll / updateWhere.
-// Each real module (Volunteers, Donations, Beneficiaries...) gets one of these.
-function makeCsvTable(fileName, headers) {
-  const filePath = path.join(DATA_DIR, fileName);
-
-  function ensure() {
-    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-    if (!fs.existsSync(filePath)) fs.writeFileSync(filePath, headers.join(",") + "\n", "utf8");
-  }
-
-  function readAll() {
-    ensure();
-    const raw = fs.readFileSync(filePath, "utf8");
-    const lines = raw.split(/\r?\n/).filter((l) => l.trim().length > 0);
-    if (lines.length <= 1) return [];
-    return lines.slice(1).map((line) => {
-      const fields = csvParseLine(line);
-      const row = {};
-      headers.forEach((h, i) => (row[h] = fields[i] ?? ""));
-      return row;
-    });
-  }
-
-  function writeAll(rows) {
-    ensure();
-    const body = rows.map((row) => headers.map((h) => csvEscape(row[h])).join(",")).join("\n");
-    fs.writeFileSync(filePath, headers.join(",") + "\n" + (body ? body + "\n" : ""), "utf8");
-  }
-
-  let writeQueue = Promise.resolve();
-  function appendRow(row) {
-    ensure();
-    writeQueue = writeQueue.then(() => new Promise((resolve, reject) => {
-      const line = headers.map((h) => csvEscape(row[h])).join(",") + "\n";
-      fs.appendFile(filePath, line, "utf8", (err) => (err ? reject(err) : resolve()));
-    }));
-    return writeQueue;
-  }
-
-  function updateWhere(predicate, updater) {
-    const rows = readAll();
-    let changed = false;
-    const next = rows.map((row) => {
-      if (predicate(row)) { changed = true; return { ...row, ...updater(row) }; }
-      return row;
-    });
-    if (changed) writeAll(next);
-    return changed;
-  }
-
-  return { ensure, readAll, writeAll, appendRow, updateWhere, filePath };
-}
-
-const usersTable = makeCsvTable("users.csv", ["id", "name", "email", "passwordHash", "role", "createdAt"]);
-const volunteersTable = makeCsvTable("volunteers.csv", ["volunteerId", "skills", "verifiedStatus", "updatedAt"]);
-const hoursTable = makeCsvTable("volunteer_hours.csv", ["id", "volunteerId", "taskName", "hoursLogged", "dateLogged", "status", "approvedBy", "approvedAt"]);
-
 // ---- Users ----
-function findUserByEmail(email) {
-  const target = String(email).trim().toLowerCase();
-  return usersTable.readAll().find((u) => u.email.trim().toLowerCase() === target);
-}
-function findUserById(id) {
-  return usersTable.readAll().find((u) => u.id === id);
-}
-function appendUser(user) {
-  return usersTable.appendRow(user);
+async function findUserByEmail(email) {
+  const res = await query(
+    `SELECT id, name, email, password_hash AS "passwordHash", role, created_at AS "createdAt"
+     FROM users WHERE lower(email) = lower($1)`,
+    [String(email).trim()]
+  );
+  return res.rows[0] || null;
 }
 
-// ---- Volunteers ----
-function findVolunteerByUserId(userId) {
-  return volunteersTable.readAll().find((v) => v.volunteerId === userId);
+async function findUserById(id) {
+  const res = await query(
+    `SELECT id, name, email, password_hash AS "passwordHash", role, created_at AS "createdAt"
+     FROM users WHERE id = $1`,
+    [id]
+  );
+  return res.rows[0] || null;
 }
-function upsertVolunteerSkills(userId, skills) {
-  const existing = findVolunteerByUserId(userId);
-  const now = new Date().toISOString();
-  if (existing) {
-    volunteersTable.updateWhere((v) => v.volunteerId === userId, () => ({ skills, updatedAt: now }));
-  } else {
-    volunteersTable.appendRow({ volunteerId: userId, skills, verifiedStatus: "Pending", updatedAt: now });
-  }
+
+async function createUser({ name, email, passwordHash, role }) {
+  const res = await query(
+    `INSERT INTO users (name, email, password_hash, role)
+     VALUES ($1, $2, $3, $4)
+     RETURNING id, name, email, role, created_at AS "createdAt"`,
+    [name, email.toLowerCase(), passwordHash, role]
+  );
+  return res.rows[0];
 }
-function setVolunteerVerified(userId, verified) {
-  volunteersTable.updateWhere(
-    (v) => v.volunteerId === userId,
-    () => ({ verifiedStatus: verified ? "Verified" : "Pending", updatedAt: new Date().toISOString() })
+
+// ---- Volunteers (FR2) ----
+async function findVolunteerByUserId(userId) {
+  const res = await query(
+    `SELECT volunteer_id AS "volunteerId", skills,
+            CASE WHEN verified_status THEN 'Verified' ELSE 'Pending' END AS "verifiedStatus",
+            updated_at AS "updatedAt"
+     FROM volunteers WHERE volunteer_id = $1`,
+    [userId]
+  );
+  return res.rows[0] || null;
+}
+
+async function upsertVolunteerSkills(userId, skills) {
+  await query(
+    `INSERT INTO volunteers (volunteer_id, skills, verified_status, updated_at)
+     VALUES ($1, $2, FALSE, now())
+     ON CONFLICT (volunteer_id) DO UPDATE SET skills = EXCLUDED.skills, updated_at = now()`,
+    [userId, skills]
   );
 }
-// Joins volunteer rows with user name/email, optionally filtered by a skill substring.
-function listVolunteers(skillFilter) {
-  const users = usersTable.readAll();
-  const volunteers = volunteersTable.readAll();
-  const usersByRole = users.filter((u) => u.role === "Volunteer");
 
-  const rows = usersByRole.map((u) => {
-    const v = volunteers.find((row) => row.volunteerId === u.id);
-    return {
-      userId: u.id,
-      name: u.name,
-      email: u.email,
-      skills: v ? v.skills : "",
-      verifiedStatus: v ? v.verifiedStatus : "Pending",
-    };
-  });
-
-  if (!skillFilter) return rows;
-  const needle = skillFilter.trim().toLowerCase();
-  return rows.filter((r) => r.skills.toLowerCase().includes(needle));
-}
-
-// ---- Volunteer hours ----
-function logHours(volunteerId, taskName, hoursLogged) {
-  return hoursTable.appendRow({
-    id: crypto.randomUUID(),
-    volunteerId,
-    taskName,
-    hoursLogged: String(hoursLogged),
-    dateLogged: new Date().toISOString(),
-    status: "Pending",
-    approvedBy: "",
-    approvedAt: "",
-  });
-}
-function listHoursForVolunteer(volunteerId) {
-  return hoursTable.readAll()
-    .filter((h) => h.volunteerId === volunteerId)
-    .sort((a, b) => new Date(b.dateLogged) - new Date(a.dateLogged));
-}
-function listPendingHours() {
-  const users = usersTable.readAll();
-  return hoursTable.readAll()
-    .filter((h) => h.status === "Pending")
-    .map((h) => {
-      const user = users.find((u) => u.id === h.volunteerId);
-      return { ...h, volunteerName: user ? user.name : "Unknown", volunteerEmail: user ? user.email : "" };
-    })
-    .sort((a, b) => new Date(a.dateLogged) - new Date(b.dateLogged));
-}
-function setHourStatus(hourId, status, approverEmail) {
-  hoursTable.updateWhere(
-    (h) => h.id === hourId,
-    () => ({ status, approvedBy: approverEmail, approvedAt: new Date().toISOString() })
+async function setVolunteerVerified(userId, verified) {
+  await query(
+    `UPDATE volunteers SET verified_status = $2, updated_at = now() WHERE volunteer_id = $1`,
+    [userId, verified]
   );
+}
+
+async function listVolunteers(skillFilter) {
+  const res = await query(
+    `SELECT u.id AS "userId", u.name, u.email,
+            COALESCE(v.skills, '') AS skills,
+            CASE WHEN v.verified_status THEN 'Verified' ELSE 'Pending' END AS "verifiedStatus"
+     FROM users u
+     LEFT JOIN volunteers v ON v.volunteer_id = u.id
+     WHERE u.role = 'Volunteer'
+       AND ($1 = '' OR COALESCE(v.skills, '') ILIKE '%' || $1 || '%')
+     ORDER BY u.name`,
+    [skillFilter || ""]
+  );
+  return res.rows;
+}
+
+// ---- Volunteer hours (FR2) ----
+async function logHours(volunteerId, taskName, hoursLogged) {
+  await query(
+    `INSERT INTO volunteer_hours (volunteer_id, task_name, hours_logged)
+     VALUES ($1, $2, $3)`,
+    [volunteerId, taskName, hoursLogged]
+  );
+}
+
+async function listHoursForVolunteer(volunteerId) {
+  const res = await query(
+    `SELECT id, task_name AS "taskName", hours_logged AS "hoursLogged",
+            date_logged AS "dateLogged", status
+     FROM volunteer_hours WHERE volunteer_id = $1
+     ORDER BY date_logged DESC`,
+    [volunteerId]
+  );
+  return res.rows;
+}
+
+async function listPendingHours() {
+  const res = await query(
+    `SELECT h.id, h.task_name AS "taskName", h.hours_logged AS "hoursLogged", h.date_logged AS "dateLogged",
+            u.name AS "volunteerName", u.email AS "volunteerEmail"
+     FROM volunteer_hours h
+     JOIN users u ON u.id = h.volunteer_id
+     WHERE h.status = 'Pending'
+     ORDER BY h.date_logged ASC`
+  );
+  return res.rows;
+}
+
+async function setHourStatus(hourId, status, approverEmail) {
+  await query(
+    `UPDATE volunteer_hours SET status = $2, approved_by = $3, approved_at = now() WHERE id = $1`,
+    [hourId, status, approverEmail]
+  );
+}
+
+// ---- Beneficiaries (FR4) ----
+async function findBeneficiaryByHash(uniqueGovHash) {
+  const res = await query(
+    `SELECT beneficiary_id AS "beneficiaryId" FROM beneficiaries WHERE unique_gov_hash = $1`,
+    [uniqueGovHash]
+  );
+  return res.rows[0] || null;
+}
+
+async function createBeneficiary({ fullName, uniqueGovHash, location, supportReceived, createdBy }) {
+  const res = await query(
+    `INSERT INTO beneficiaries (full_name, unique_gov_hash, location, support_received, created_by)
+     VALUES ($1, $2, $3, $4, $5)
+     RETURNING beneficiary_id AS "beneficiaryId"`,
+    [fullName, uniqueGovHash, location, supportReceived || "", createdBy]
+  );
+  return res.rows[0];
+}
+
+async function listBeneficiaries(search) {
+  const res = await query(
+    `SELECT beneficiary_id AS "beneficiaryId", full_name AS "fullName", unique_gov_hash AS "uniqueGovHash",
+            location, support_received AS "supportReceived", created_at AS "createdAt"
+     FROM beneficiaries
+     WHERE ($1 = '' OR full_name ILIKE '%' || $1 || '%' OR location ILIKE '%' || $1 || '%')
+     ORDER BY created_at DESC`,
+    [search || ""]
+  );
+  return res.rows;
+}
+
+async function findBeneficiaryById(id) {
+  const res = await query(
+    `SELECT beneficiary_id AS "beneficiaryId", full_name AS "fullName", unique_gov_hash AS "uniqueGovHash",
+            location, support_received AS "supportReceived", created_at AS "createdAt"
+     FROM beneficiaries WHERE beneficiary_id = $1`,
+    [id]
+  );
+  return res.rows[0] || null;
+}
+
+async function logAid(beneficiaryId, description, aidType, recordedBy) {
+  await query(
+    `INSERT INTO beneficiary_aid_log (beneficiary_id, description, aid_type, recorded_by)
+     VALUES ($1, $2, $3, $4)`,
+    [beneficiaryId, description, aidType || "", recordedBy]
+  );
+}
+
+async function listAidForBeneficiary(beneficiaryId) {
+  const res = await query(
+    `SELECT id, description, aid_type AS "aidType", date_provided AS "dateProvided", recorded_by AS "recordedBy"
+     FROM beneficiary_aid_log WHERE beneficiary_id = $1
+     ORDER BY date_provided DESC`,
+    [beneficiaryId]
+  );
+  return res.rows;
 }
 
 /* ============================================================
@@ -365,7 +359,7 @@ body.app-body{ display:block; padding:0; }
 .skill-tag{ display:inline-block; background:var(--bg); color:var(--teal); padding:2px 8px; border-radius:6px;
   font-size:11px; font-weight:700; margin:1px 3px 1px 0; }
 .empty-state{ padding:28px; text-align:center; color:var(--muted); font-size:13px; }
-.hint-text{ font-size:11.5px; color:var(--muted); margin-top:-6px; }
+.hint-text{ font-size:11.5px; color:var(--muted); margin-top:-6px; display:block; margin-bottom:6px; }
 `;
 
 const HEART_GLYPH = `<span class="glyph"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 21s-7.5-4.6-10-9.3C0.3 8.1 2 4.5 5.4 4c2-.3 3.7.6 4.9 2.1L12 8l1.7-1.9C15 4.6 16.7 3.7 18.6 4c3.4.5 5.1 4.1 3.4 7.7C19.5 16.4 12 21 12 21z" fill="#fff"/></svg></span>`;
@@ -722,6 +716,7 @@ function dashboardPage(user) {
   }
   if (isManager) {
     actions += `<a class="btn-primary" href="/volunteers">Manage volunteers</a>`;
+    actions += `<a class="btn-primary" href="/beneficiaries">Manage beneficiaries</a>`;
   }
   if (!actions) {
     actions = `<p class="hint-text">No modules are available for your role yet.</p>`;
@@ -952,17 +947,180 @@ ${LOGOUT_SCRIPT}
 </html>`;
 }
 
+function beneficiariesListPage(user, beneficiaries, search) {
+  const rows = beneficiaries.length
+    ? beneficiaries.map((b) => `
+        <tr>
+          <td><a class="link" href="/beneficiaries/${encodeURIComponent(b.beneficiaryId)}">${escapeHtml(b.fullName)}</a></td>
+          <td>${escapeHtml(b.location)}</td>
+          <td>${escapeHtml(b.supportReceived || "—")}</td>
+          <td>${escapeHtml(new Date(b.createdAt).toLocaleDateString())}</td>
+        </tr>`).join("")
+    : `<tr><td colspan="4" class="empty-state">No beneficiaries match this search.</td></tr>`;
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Beneficiaries · NGO Management System</title>
+<style>${SHARED_CSS}</style>
+</head>
+<body class="app-body">
+  ${topbar()}
+  <div class="page">
+    <h1>Beneficiaries</h1>
+    <p class="lede">Centralized profiles and aid history. Not visible to volunteers, donors, or the public.</p>
+
+    <div class="card">
+      <div class="row-between" style="margin-bottom:16px;">
+        <form class="search-row" method="GET" action="/beneficiaries" style="margin-bottom:0;">
+          <input type="text" class="search-input" name="search" placeholder="Search by name or location" value="${escapeHtml(search || "")}" />
+          <button type="submit" class="btn-small primary">Search</button>
+          ${search ? `<a class="btn-small" href="/beneficiaries">Clear</a>` : ""}
+        </form>
+        <a class="btn-primary" href="/beneficiaries/new" style="width:auto;align-self:flex-start;padding:9px 16px;">Add beneficiary</a>
+      </div>
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Name</th><th>Location</th><th>Support received</th><th>Added</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+${LOGOUT_SCRIPT}
+</body>
+</html>`;
+}
+
+function beneficiaryNewPage(user, errorMessage) {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Add Beneficiary · NGO Management System</title>
+<style>${SHARED_CSS}</style>
+</head>
+<body class="app-body">
+  ${topbar()}
+  <div class="page">
+    <h1>Add a beneficiary</h1>
+    <p class="lede">Every government ID / unique hash can only be registered once.</p>
+
+    <div class="card" style="max-width:520px;">
+      ${errorMessage ? `<div class="banner error show" style="margin-bottom:16px;">${escapeHtml(errorMessage)}</div>` : ""}
+      <form method="POST" action="/beneficiaries">
+        <div class="field">
+          <label for="fullName">Full legal name</label>
+          <input type="text" id="fullName" name="fullName" placeholder="Deepa Nair" required />
+        </div>
+        <div class="field">
+          <label for="uniqueGovHash">Government ID / unique hash</label>
+          <input type="text" id="uniqueGovHash" name="uniqueGovHash" placeholder="e.g. hashed Aadhaar / ration card ID" required />
+          <span class="hint-text">Used to prevent duplicate profiles — this must be unique per person.</span>
+        </div>
+        <div class="field">
+          <label for="location">Location</label>
+          <input type="text" id="location" name="location" placeholder="Region or district" required />
+        </div>
+        <div class="field">
+          <label for="supportReceived">Specific needs / support summary</label>
+          <input type="text" id="supportReceived" name="supportReceived" placeholder="e.g. Monthly food ration, school supplies" />
+        </div>
+        <button type="submit" class="btn-primary" style="width:auto;align-self:flex-start;padding:10px 18px;">Create profile</button>
+      </form>
+    </div>
+  </div>
+${LOGOUT_SCRIPT}
+</body>
+</html>`;
+}
+
+function beneficiaryDetailPage(user, beneficiary, aidLog) {
+  const rows = aidLog.length
+    ? aidLog.map((a) => `
+        <tr>
+          <td>${escapeHtml(a.description)}</td>
+          <td>${escapeHtml(a.aidType || "—")}</td>
+          <td>${escapeHtml(new Date(a.dateProvided).toLocaleDateString())}</td>
+          <td>${escapeHtml(a.recordedBy || "—")}</td>
+        </tr>`).join("")
+    : `<tr><td colspan="4" class="empty-state">No aid logged yet.</td></tr>`;
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>${escapeHtml(beneficiary.fullName)} · NGO Management System</title>
+<style>${SHARED_CSS}</style>
+</head>
+<body class="app-body">
+  ${topbar()}
+  <div class="page">
+    <h1>${escapeHtml(beneficiary.fullName)}</h1>
+    <p class="lede"><a class="link" href="/beneficiaries">← Back to all beneficiaries</a></p>
+
+    <div class="card">
+      <dl>
+        <dt>Full name</dt><dd>${escapeHtml(beneficiary.fullName)}</dd>
+        <dt>Government ID</dt><dd>${escapeHtml(beneficiary.uniqueGovHash)}</dd>
+        <dt>Location</dt><dd>${escapeHtml(beneficiary.location)}</dd>
+        <dt>Support summary</dt><dd>${escapeHtml(beneficiary.supportReceived || "—")}</dd>
+        <dt>Profile created</dt><dd>${escapeHtml(new Date(beneficiary.createdAt).toLocaleDateString())}</dd>
+      </dl>
+    </div>
+
+    <div class="card">
+      <h3>Log aid delivered</h3>
+      <p class="card-sub">Each entry adds to this beneficiary's permanent aid history.</p>
+      <form method="POST" action="/beneficiaries/${encodeURIComponent(beneficiary.beneficiaryId)}/aid">
+        <div class="field">
+          <label for="description">What was provided</label>
+          <input type="text" id="description" name="description" placeholder="e.g. 10kg rice, 2L cooking oil" required />
+        </div>
+        <div class="field">
+          <label for="aidType">Category (optional)</label>
+          <input type="text" id="aidType" name="aidType" placeholder="Food, Medical, Education, Shelter..." />
+        </div>
+        <button type="submit" class="btn-primary" style="width:auto;align-self:flex-start;padding:10px 18px;">Log aid</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h3>Aid history</h3>
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Description</th><th>Category</th><th>Date</th><th>Recorded by</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+${LOGOUT_SCRIPT}
+</body>
+</html>`;
+}
+
 /* ============================================================
    4. MIDDLEWARE
    ============================================================ */
 
-function requireAuth(req, res, next) {
+// Wraps an async route/middleware so a rejected promise reaches Express's
+// error handler instead of crashing the process or hanging the request.
+function asyncRoute(fn) {
+  return (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
+}
+
+const requireAuth = asyncRoute(async (req, res, next) => {
   if (!req.session.userEmail) return res.redirect("/login");
-  const user = findUserByEmail(req.session.userEmail);
+  const user = await findUserByEmail(req.session.userEmail);
   if (!user) return res.redirect("/login");
   req.currentUser = user;
   next();
-}
+});
 
 function requireRole(...roles) {
   return (req, res, next) => {
@@ -1001,72 +1159,54 @@ app.get("/register", (req, res) => res.type("html").send(registerPage()));
 app.get("/dashboard", requireAuth, (req, res) => res.type("html").send(dashboardPage(req.currentUser)));
 
 /* ---------- Auth: API ---------- */
-app.post("/api/register", async (req, res) => {
-  try {
-    const { name, email, password, confirmPassword, role } = req.body || {};
-    if (!name || !name.trim()) return res.status(400).json({ error: "Full name is required." });
-    if (!isValidEmail(email)) return res.status(400).json({ error: "Enter a valid email address." });
-    if (!password || password.length < 8) return res.status(400).json({ error: "Password must be at least 8 characters." });
-    if (password !== confirmPassword) return res.status(400).json({ error: "Passwords do not match." });
-    if (!VALID_ROLES.includes(role)) return res.status(400).json({ error: "Select a valid role." });
+app.post("/api/register", asyncRoute(async (req, res) => {
+  const { name, email, password, confirmPassword, role } = req.body || {};
+  if (!name || !name.trim()) return res.status(400).json({ error: "Full name is required." });
+  if (!isValidEmail(email)) return res.status(400).json({ error: "Enter a valid email address." });
+  if (!password || password.length < 8) return res.status(400).json({ error: "Password must be at least 8 characters." });
+  if (password !== confirmPassword) return res.status(400).json({ error: "Passwords do not match." });
+  if (!VALID_ROLES.includes(role)) return res.status(400).json({ error: "Select a valid role." });
 
-    if (findUserByEmail(email)) {
-      return res.status(409).json({ error: "An account with this email already exists." });
-    }
-
-    const passwordHash = await bcrypt.hash(password, 10);
-    const user = {
-      id: crypto.randomUUID(),
-      name: name.trim(),
-      email: email.trim().toLowerCase(),
-      passwordHash,
-      role,
-      createdAt: new Date().toISOString(),
-    };
-    await appendUser(user);
-
-    req.session.userEmail = user.email;
-    return res.status(201).json({
-      message: "Account created successfully.",
-      user: { name: user.name, email: user.email, role: user.role },
-    });
-  } catch (err) {
-    console.error("Register error:", err);
-    return res.status(500).json({ error: "Something went wrong. Please try again." });
+  if (await findUserByEmail(email)) {
+    return res.status(409).json({ error: "An account with this email already exists." });
   }
-});
 
-app.post("/api/login", async (req, res) => {
-  try {
-    const { email, password, remember } = req.body || {};
-    if (!isValidEmail(email) || !password) {
-      return res.status(400).json({ error: "Enter a valid email and password." });
-    }
-    const user = findUserByEmail(email);
-    if (!user) return res.status(401).json({ error: "Incorrect email or password." });
+  const passwordHash = await bcrypt.hash(password, 10);
+  const user = await createUser({ name: name.trim(), email, passwordHash, role });
 
-    const ok = await bcrypt.compare(password, user.passwordHash);
-    if (!ok) return res.status(401).json({ error: "Incorrect email or password." });
+  req.session.userEmail = user.email;
+  return res.status(201).json({
+    message: "Account created successfully.",
+    user: { name: user.name, email: user.email, role: user.role },
+  });
+}));
 
-    req.session.userEmail = user.email;
-    if (remember) req.session.cookie.maxAge = 1000 * 60 * 60 * 24 * 30;
-
-    return res.json({
-      message: "Signed in successfully.",
-      user: { name: user.name, email: user.email, role: user.role },
-    });
-  } catch (err) {
-    console.error("Login error:", err);
-    return res.status(500).json({ error: "Something went wrong. Please try again." });
+app.post("/api/login", asyncRoute(async (req, res) => {
+  const { email, password, remember } = req.body || {};
+  if (!isValidEmail(email) || !password) {
+    return res.status(400).json({ error: "Enter a valid email and password." });
   }
-});
+  const user = await findUserByEmail(email);
+  if (!user) return res.status(401).json({ error: "Incorrect email or password." });
 
-app.get("/api/me", (req, res) => {
+  const ok = await bcrypt.compare(password, user.passwordHash);
+  if (!ok) return res.status(401).json({ error: "Incorrect email or password." });
+
+  req.session.userEmail = user.email;
+  if (remember) req.session.cookie.maxAge = 1000 * 60 * 60 * 24 * 30;
+
+  return res.json({
+    message: "Signed in successfully.",
+    user: { name: user.name, email: user.email, role: user.role },
+  });
+}));
+
+app.get("/api/me", asyncRoute(async (req, res) => {
   if (!req.session.userEmail) return res.status(401).json({ error: "Not signed in." });
-  const user = findUserByEmail(req.session.userEmail);
+  const user = await findUserByEmail(req.session.userEmail);
   if (!user) return res.status(401).json({ error: "Not signed in." });
   return res.json({ user: { name: user.name, email: user.email, role: user.role } });
-});
+}));
 
 app.post("/api/logout", (req, res) => {
   req.session.destroy(() => {
@@ -1077,58 +1217,140 @@ app.post("/api/logout", (req, res) => {
 
 /* ---------- Volunteer Management: self-service (role: Volunteer) ---------- */
 
-app.get("/volunteer/profile", requireAuth, requireRole("Volunteer"), (req, res) => {
-  const volunteerRecord = findVolunteerByUserId(req.currentUser.id);
-  const hourLogs = listHoursForVolunteer(req.currentUser.id);
+app.get("/volunteer/profile", requireAuth, requireRole("Volunteer"), asyncRoute(async (req, res) => {
+  const volunteerRecord = await findVolunteerByUserId(req.currentUser.id);
+  const hourLogs = await listHoursForVolunteer(req.currentUser.id);
   res.type("html").send(volunteerProfilePage(req.currentUser, volunteerRecord, hourLogs));
-});
+}));
 
-app.post("/volunteer/skills", requireAuth, requireRole("Volunteer"), (req, res) => {
+app.post("/volunteer/skills", requireAuth, requireRole("Volunteer"), asyncRoute(async (req, res) => {
   const skills = String(req.body.skills || "").trim();
-  upsertVolunteerSkills(req.currentUser.id, skills);
+  await upsertVolunteerSkills(req.currentUser.id, skills);
   res.redirect("/volunteer/profile");
-});
+}));
 
-app.post("/volunteer/hours", requireAuth, requireRole("Volunteer"), (req, res) => {
+app.post("/volunteer/hours", requireAuth, requireRole("Volunteer"), asyncRoute(async (req, res) => {
   const taskName = String(req.body.taskName || "").trim();
   const hoursLogged = parseFloat(req.body.hoursLogged);
   if (taskName && hoursLogged > 0) {
-    logHours(req.currentUser.id, taskName, hoursLogged);
+    await logHours(req.currentUser.id, taskName, hoursLogged);
   }
   res.redirect("/volunteer/profile");
-});
+}));
 
 /* ---------- Volunteer Management: admin (role: Project Manager, Super Admin) ---------- */
 
-app.get("/volunteers", requireAuth, requireRole("Project Manager", "Super Admin"), (req, res) => {
+app.get("/volunteers", requireAuth, requireRole("Project Manager", "Super Admin"), asyncRoute(async (req, res) => {
   const skillFilter = req.query.skill ? String(req.query.skill) : "";
-  const volunteers = listVolunteers(skillFilter);
-  const pendingHours = listPendingHours();
+  const volunteers = await listVolunteers(skillFilter);
+  const pendingHours = await listPendingHours();
   res.type("html").send(volunteersAdminPage(req.currentUser, volunteers, pendingHours, skillFilter));
-});
+}));
 
-app.post("/volunteers/:id/verify", requireAuth, requireRole("Project Manager", "Super Admin"), (req, res) => {
-  setVolunteerVerified(req.params.id, true);
+app.post("/volunteers/:id/verify", requireAuth, requireRole("Project Manager", "Super Admin"), asyncRoute(async (req, res) => {
+  await setVolunteerVerified(req.params.id, true);
   res.redirect("/volunteers");
-});
+}));
 
-app.post("/volunteers/:id/unverify", requireAuth, requireRole("Project Manager", "Super Admin"), (req, res) => {
-  setVolunteerVerified(req.params.id, false);
+app.post("/volunteers/:id/unverify", requireAuth, requireRole("Project Manager", "Super Admin"), asyncRoute(async (req, res) => {
+  await setVolunteerVerified(req.params.id, false);
   res.redirect("/volunteers");
-});
+}));
 
-app.post("/hours/:id/approve", requireAuth, requireRole("Project Manager", "Super Admin"), (req, res) => {
-  setHourStatus(req.params.id, "Approved", req.currentUser.email);
+app.post("/hours/:id/approve", requireAuth, requireRole("Project Manager", "Super Admin"), asyncRoute(async (req, res) => {
+  await setHourStatus(req.params.id, "Approved", req.currentUser.email);
   res.redirect("/volunteers");
-});
+}));
 
-app.post("/hours/:id/reject", requireAuth, requireRole("Project Manager", "Super Admin"), (req, res) => {
-  setHourStatus(req.params.id, "Rejected", req.currentUser.email);
+app.post("/hours/:id/reject", requireAuth, requireRole("Project Manager", "Super Admin"), asyncRoute(async (req, res) => {
+  await setHourStatus(req.params.id, "Rejected", req.currentUser.email);
   res.redirect("/volunteers");
+}));
+
+/* ---------- Beneficiary Management (role: Project Manager, Super Admin) ---------- */
+/* Restricted per SRS Section 8: "Unregistered public browsers cannot look up
+   personal beneficiary identification details." Volunteers/Donors/Public
+   Visitors don't get access either, at least until a narrower, field-safe
+   view is designed. */
+
+const BENEFICIARY_ROLES = ["Project Manager", "Super Admin"];
+
+app.get("/beneficiaries", requireAuth, requireRole(...BENEFICIARY_ROLES), asyncRoute(async (req, res) => {
+  const search = req.query.search ? String(req.query.search) : "";
+  const beneficiaries = await listBeneficiaries(search);
+  res.type("html").send(beneficiariesListPage(req.currentUser, beneficiaries, search));
+}));
+
+app.get("/beneficiaries/new", requireAuth, requireRole(...BENEFICIARY_ROLES), (req, res) => {
+  res.type("html").send(beneficiaryNewPage(req.currentUser, null));
 });
 
-app.listen(PORT, () => {
-  console.log(`NGO Management System running at http://localhost:${PORT}`);
-  console.log(`Open http://localhost:${PORT}/login to sign in.`);
-  console.log(`Data is stored in the data/ folder (users.csv, volunteers.csv, volunteer_hours.csv)`);
+app.post("/beneficiaries", requireAuth, requireRole(...BENEFICIARY_ROLES), asyncRoute(async (req, res) => {
+  const fullName = String(req.body.fullName || "").trim();
+  const uniqueGovHash = String(req.body.uniqueGovHash || "").trim();
+  const location = String(req.body.location || "").trim();
+  const supportReceived = String(req.body.supportReceived || "").trim();
+
+  if (!fullName || !uniqueGovHash || !location) {
+    return res.status(400).type("html").send(
+      beneficiaryNewPage(req.currentUser, "Full name, government ID / unique hash, and location are all required.")
+    );
+  }
+
+  // Deduplication check (FR4 + Section 8 constraint) — the database's UNIQUE
+  // constraint on unique_gov_hash would also catch this, but checking first
+  // lets us show a friendly message instead of a raw constraint-violation error.
+  const existing = await findBeneficiaryByHash(uniqueGovHash);
+  if (existing) {
+    return res.status(409).type("html").send(
+      beneficiaryNewPage(req.currentUser, "A beneficiary with this government ID / unique hash already exists.")
+    );
+  }
+
+  const created = await createBeneficiary({
+    fullName, uniqueGovHash, location, supportReceived, createdBy: req.currentUser.id,
+  });
+  res.redirect(`/beneficiaries/${created.beneficiaryId}`);
+}));
+
+app.get("/beneficiaries/:id", requireAuth, requireRole(...BENEFICIARY_ROLES), asyncRoute(async (req, res) => {
+  const beneficiary = await findBeneficiaryById(req.params.id);
+  if (!beneficiary) {
+    return res.status(404).type("html").send(errorPage("Not found", "This beneficiary record doesn't exist."));
+  }
+  const aidLog = await listAidForBeneficiary(req.params.id);
+  res.type("html").send(beneficiaryDetailPage(req.currentUser, beneficiary, aidLog));
+}));
+
+app.post("/beneficiaries/:id/aid", requireAuth, requireRole(...BENEFICIARY_ROLES), asyncRoute(async (req, res) => {
+  const description = String(req.body.description || "").trim();
+  const aidType = String(req.body.aidType || "").trim();
+  if (description) {
+    await logAid(req.params.id, description, aidType, req.currentUser.email);
+  }
+  res.redirect(`/beneficiaries/${req.params.id}`);
+}));
+
+/* ---------- Error handler (catches anything asyncRoute forwarded) ---------- */
+app.use((err, req, res, next) => {
+  console.error("Unhandled error:", err);
+  if (res.headersSent) return next(err);
+  res.status(500).type("html").send(
+    errorPage("Something went wrong", "Please try again in a moment. If this keeps happening, check that the database is reachable.")
+  );
 });
+
+ensureSchema()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`NGO Management System running at http://localhost:${PORT}`);
+      console.log(`Open http://localhost:${PORT}/login to sign in.`);
+      console.log(`Connected to PostgreSQL (see db.js / DATABASE_URL).`);
+    });
+  })
+  .catch((err) => {
+    console.error("Could not connect to PostgreSQL or apply schema.sql:");
+    console.error(err.message);
+    console.error("Check that PostgreSQL is running and DATABASE_URL is correct (see README.md).");
+    process.exit(1);
+  });

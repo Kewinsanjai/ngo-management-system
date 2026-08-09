@@ -1,14 +1,16 @@
 {
-  "name": "ngo-management-system-auth",
+  "name": "ngo-management-system",
   "version": "1.0.0",
-  "description": "NGO Management System — login & registration module (CSV-backed)",
+  "description": "NGO Management System — Auth, Volunteer Management, Beneficiary Management (PostgreSQL-backed)",
   "main": "app.js",
   "scripts": {
     "start": "node app.js"
   },
   "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "dotenv": "^17.4.2",
     "express": "^4.19.2",
     "express-session": "^1.18.0",
-    "bcryptjs": "^2.4.3"
+    "pg": "^8.23.0"
   }
 }
