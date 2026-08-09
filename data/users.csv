@@ -1,2 +1,4 @@
 id,name,email,passwordHash,role,createdAt
 10c8562d-1cdf-4105-9d13-0cca4320cb1b,Kewin,kewinsanjai2510982@ssn.edu.in,$2a$10$.Uc.4TCg.op3RUqjz12re.dA30ABelWZV492T6dZfYPDeK51ggbg6,Super Admin,2026-08-05T07:53:47.184Z
+550a992e-16aa-435f-8ec8-7db9732ccff9,Kishore,kishore@gmail.com,$2a$10$QNNx.Tsl86nDmnan8AR2BuhIg/NKt.SFSWDVz8BKh1HIsECOt.PDe,Donor,2026-08-05T17:12:53.725Z
+48ac77eb-4f9a-46ca-bfaf-c3aedeff00a8,kewin,kewin@gmail.com,$2a$10$JU8mBuUjUlguDfKMbmz0nOM1l0tB9bBpoe.d9lCOfq9FnE7U5I.Fy,Super Admin,2026-08-08T15:17:27.816Z

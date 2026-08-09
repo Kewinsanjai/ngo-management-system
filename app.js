@@ -1,18 +1,22 @@
 /**
- * NGO Management System — Auth Module
- * ------------------------------------
- * Everything lives in this one file: the Express server, the CSV-backed
- * user store, and the login / register / dashboard pages (HTML, CSS, JS
- * all inlined as templates below).
+ * NGO Management System — Auth + Volunteer Management
+ * -----------------------------------------------------
+ * One file: Express server, CSV-backed storage, and every page's
+ * HTML/CSS/JS templated inline below.
  *
  * Run it:
  *   npm install
  *   node app.js
  *   open http://localhost:3000/login
  *
- * User records are appended to data/users.csv. When the rest of the
- * system moves to a real database, only the "CSV STORE" section below
- * needs to change — everything else (routes, pages) stays the same.
+ * Modules in this file:
+ *   1. CSV STORE      — generic CSV table helper + Users/Volunteers/Hours tables
+ *   2. SHARED CSS      — one stylesheet, reused by every page
+ *   3. PAGE TEMPLATES  — functions returning full HTML strings
+ *   4. MIDDLEWARE       — session auth + role guards
+ *   5. APP / ROUTES    — Auth routes, then Volunteer Management routes
+ *
+ * When the system moves to a real database, only section 1 changes.
  */
 
 const express = require("express");
@@ -26,11 +30,10 @@ const PORT = process.env.PORT || 3000;
 const VALID_ROLES = ["Super Admin", "Project Manager", "Volunteer", "Donor", "Public Visitor"];
 
 /* ============================================================
-   CSV STORE — swap this section for a real database later
+   1. CSV STORE — swap this section for a real database later
    ============================================================ */
 
-const CSV_PATH = path.join(__dirname, "data", "users.csv");
-const CSV_HEADERS = ["id", "name", "email", "passwordHash", "role", "createdAt"];
+const DATA_DIR = path.join(__dirname, "data");
 
 function csvEscape(value) {
   const str = String(value ?? "");
@@ -61,49 +64,160 @@ function csvParseLine(line) {
   return fields;
 }
 
-function ensureCsv() {
-  const dir = path.dirname(CSV_PATH);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  if (!fs.existsSync(CSV_PATH)) fs.writeFileSync(CSV_PATH, CSV_HEADERS.join(",") + "\n", "utf8");
+// A generic CSV-backed "table" — readAll / appendRow / writeAll / updateWhere.
+// Each real module (Volunteers, Donations, Beneficiaries...) gets one of these.
+function makeCsvTable(fileName, headers) {
+  const filePath = path.join(DATA_DIR, fileName);
+
+  function ensure() {
+    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+    if (!fs.existsSync(filePath)) fs.writeFileSync(filePath, headers.join(",") + "\n", "utf8");
+  }
+
+  function readAll() {
+    ensure();
+    const raw = fs.readFileSync(filePath, "utf8");
+    const lines = raw.split(/\r?\n/).filter((l) => l.trim().length > 0);
+    if (lines.length <= 1) return [];
+    return lines.slice(1).map((line) => {
+      const fields = csvParseLine(line);
+      const row = {};
+      headers.forEach((h, i) => (row[h] = fields[i] ?? ""));
+      return row;
+    });
+  }
+
+  function writeAll(rows) {
+    ensure();
+    const body = rows.map((row) => headers.map((h) => csvEscape(row[h])).join(",")).join("\n");
+    fs.writeFileSync(filePath, headers.join(",") + "\n" + (body ? body + "\n" : ""), "utf8");
+  }
+
+  let writeQueue = Promise.resolve();
+  function appendRow(row) {
+    ensure();
+    writeQueue = writeQueue.then(() => new Promise((resolve, reject) => {
+      const line = headers.map((h) => csvEscape(row[h])).join(",") + "\n";
+      fs.appendFile(filePath, line, "utf8", (err) => (err ? reject(err) : resolve()));
+    }));
+    return writeQueue;
+  }
+
+  function updateWhere(predicate, updater) {
+    const rows = readAll();
+    let changed = false;
+    const next = rows.map((row) => {
+      if (predicate(row)) { changed = true; return { ...row, ...updater(row) }; }
+      return row;
+    });
+    if (changed) writeAll(next);
+    return changed;
+  }
+
+  return { ensure, readAll, writeAll, appendRow, updateWhere, filePath };
 }
 
-function readUsers() {
-  ensureCsv();
-  const raw = fs.readFileSync(CSV_PATH, "utf8");
-  const lines = raw.split(/\r?\n/).filter((l) => l.trim().length > 0);
-  if (lines.length <= 1) return [];
-  return lines.slice(1).map((line) => {
-    const fields = csvParseLine(line);
-    const user = {};
-    CSV_HEADERS.forEach((h, i) => (user[h] = fields[i] ?? ""));
-    return user;
-  });
-}
+const usersTable = makeCsvTable("users.csv", ["id", "name", "email", "passwordHash", "role", "createdAt"]);
+const volunteersTable = makeCsvTable("volunteers.csv", ["volunteerId", "skills", "verifiedStatus", "updatedAt"]);
+const hoursTable = makeCsvTable("volunteer_hours.csv", ["id", "volunteerId", "taskName", "hoursLogged", "dateLogged", "status", "approvedBy", "approvedAt"]);
 
-let writeQueue = Promise.resolve();
-function appendUser(user) {
-  ensureCsv();
-  writeQueue = writeQueue.then(() => new Promise((resolve, reject) => {
-    const row = CSV_HEADERS.map((h) => csvEscape(user[h])).join(",") + "\n";
-    fs.appendFile(CSV_PATH, row, "utf8", (err) => (err ? reject(err) : resolve()));
-  }));
-  return writeQueue;
-}
-
+// ---- Users ----
 function findUserByEmail(email) {
   const target = String(email).trim().toLowerCase();
-  return readUsers().find((u) => u.email.trim().toLowerCase() === target);
+  return usersTable.readAll().find((u) => u.email.trim().toLowerCase() === target);
+}
+function findUserById(id) {
+  return usersTable.readAll().find((u) => u.id === id);
+}
+function appendUser(user) {
+  return usersTable.appendRow(user);
+}
+
+// ---- Volunteers ----
+function findVolunteerByUserId(userId) {
+  return volunteersTable.readAll().find((v) => v.volunteerId === userId);
+}
+function upsertVolunteerSkills(userId, skills) {
+  const existing = findVolunteerByUserId(userId);
+  const now = new Date().toISOString();
+  if (existing) {
+    volunteersTable.updateWhere((v) => v.volunteerId === userId, () => ({ skills, updatedAt: now }));
+  } else {
+    volunteersTable.appendRow({ volunteerId: userId, skills, verifiedStatus: "Pending", updatedAt: now });
+  }
+}
+function setVolunteerVerified(userId, verified) {
+  volunteersTable.updateWhere(
+    (v) => v.volunteerId === userId,
+    () => ({ verifiedStatus: verified ? "Verified" : "Pending", updatedAt: new Date().toISOString() })
+  );
+}
+// Joins volunteer rows with user name/email, optionally filtered by a skill substring.
+function listVolunteers(skillFilter) {
+  const users = usersTable.readAll();
+  const volunteers = volunteersTable.readAll();
+  const usersByRole = users.filter((u) => u.role === "Volunteer");
+
+  const rows = usersByRole.map((u) => {
+    const v = volunteers.find((row) => row.volunteerId === u.id);
+    return {
+      userId: u.id,
+      name: u.name,
+      email: u.email,
+      skills: v ? v.skills : "",
+      verifiedStatus: v ? v.verifiedStatus : "Pending",
+    };
+  });
+
+  if (!skillFilter) return rows;
+  const needle = skillFilter.trim().toLowerCase();
+  return rows.filter((r) => r.skills.toLowerCase().includes(needle));
+}
+
+// ---- Volunteer hours ----
+function logHours(volunteerId, taskName, hoursLogged) {
+  return hoursTable.appendRow({
+    id: crypto.randomUUID(),
+    volunteerId,
+    taskName,
+    hoursLogged: String(hoursLogged),
+    dateLogged: new Date().toISOString(),
+    status: "Pending",
+    approvedBy: "",
+    approvedAt: "",
+  });
+}
+function listHoursForVolunteer(volunteerId) {
+  return hoursTable.readAll()
+    .filter((h) => h.volunteerId === volunteerId)
+    .sort((a, b) => new Date(b.dateLogged) - new Date(a.dateLogged));
+}
+function listPendingHours() {
+  const users = usersTable.readAll();
+  return hoursTable.readAll()
+    .filter((h) => h.status === "Pending")
+    .map((h) => {
+      const user = users.find((u) => u.id === h.volunteerId);
+      return { ...h, volunteerName: user ? user.name : "Unknown", volunteerEmail: user ? user.email : "" };
+    })
+    .sort((a, b) => new Date(a.dateLogged) - new Date(b.dateLogged));
+}
+function setHourStatus(hourId, status, approverEmail) {
+  hoursTable.updateWhere(
+    (h) => h.id === hourId,
+    () => ({ status, approvedBy: approverEmail, approvedAt: new Date().toISOString() })
+  );
 }
 
 /* ============================================================
-   SHARED CSS — used by every page below
+   2. SHARED CSS
    ============================================================ */
 
 const SHARED_CSS = `
 :root{
   --navy:#05374D; --navy-2:#072F42; --teal:#028090; --seafoam:#00A896; --mint:#02C39A;
   --ink:#12262B; --muted:#5B7373; --muted-2:#8FA6A6; --bg:#F1F7F6; --white:#FFFFFF;
-  --danger:#B3261E; --danger-bg:#FCEEEC; --success-bg:#E8F6F3; --ring: rgba(2,128,144,0.35);
+  --danger:#B3261E; --danger-bg:#FCEEEC; --success-bg:#E8F6F3; --warn-bg:#FFF4E0; --warn-ink:#8A5A00; --ring: rgba(2,128,144,0.35);
   --font-head: Cambria, "Times New Roman", Georgia, serif;
   --font-body: Calibri, "Segoe UI", Arial, sans-serif;
 }
@@ -123,7 +237,7 @@ body{ font-family: var(--font-body); background: var(--bg); color: var(--ink); m
   top:-130px; right:-110px; }
 .brand-mark{ display:flex; align-items:center; gap:10px; margin-bottom: 36px; }
 .brand-mark .glyph{ width:36px; height:36px; border-radius:10px; background: var(--teal);
-  display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-right:10px; }
 .brand-mark .glyph svg{ width:20px; height:20px; }
 .brand-mark span{ font-family: var(--font-head); font-size: 16.5px; font-weight:700; }
 .brand h1{ font-family: var(--font-head); font-size: 28px; line-height:1.28; margin: 0 0 12px 0;
@@ -176,7 +290,8 @@ form{ display:flex; flex-direction:column; gap: 14px; }
 .link:hover{ color: var(--navy); text-decoration:underline; }
 .btn-primary{ margin-top: 4px; width:100%; padding: 12px 16px; background: var(--teal); color:#fff; border:none;
   border-radius: 8px; font-family: var(--font-body); font-size: 14px; font-weight:700; cursor:pointer;
-  display:flex; align-items:center; justify-content:center; gap:9px; transition: background .15s ease, transform .05s ease; }
+  display:flex; align-items:center; justify-content:center; gap:9px; transition: background .15s ease, transform .05s ease;
+  text-decoration:none; }
 .btn-primary:hover{ background: #026a77; }
 .btn-primary:active{ transform: translateY(1px); }
 .btn-primary:disabled{ opacity:0.85; cursor:progress; }
@@ -194,26 +309,63 @@ form{ display:flex; flex-direction:column; gap: 14px; }
 @media (max-width: 820px){ .shell{ flex-direction: column; min-height:auto; } .brand{ padding: 32px 28px; }
   .brand h1{ font-size: 23px; max-width:none; } .auth{ padding: 32px 28px 36px; } }
 @media (max-width: 420px){ body{ padding:0; } .shell{ border-radius:0; box-shadow:none; } }
-/* dashboard-only bits */
-body.dashboard-body{ display:block; padding:0; }
+
+/* app-shell pages (dashboard, volunteer profile, admin) */
+body.app-body{ display:block; padding:0; }
 .topbar{ display:flex; align-items:center; justify-content:space-between; padding: 16px 32px;
   background: var(--white); border-bottom: 1px solid #E4EEEC; }
 .topbar .brand-mark{ margin:0; }
 .topbar .brand-mark .glyph{ width:32px; height:32px; border-radius:9px; }
 .topbar .brand-mark .glyph svg{ width:18px; height:18px; }
 .topbar .brand-mark span{ font-size:15px; color:var(--navy); }
+.topbar-right{ display:flex; align-items:center; gap:14px; }
+.topbar-link{ font-size:13px; font-weight:700; color:var(--muted); text-decoration:none; }
+.topbar-link:hover{ color:var(--teal); }
 .btn-ghost{ background:none; border:1.5px solid #DDE9E7; color:var(--muted); padding:8px 14px;
   border-radius:8px; font-size:13px; font-weight:700; cursor:pointer; font-family:var(--font-body); }
 .btn-ghost:hover{ border-color:var(--teal); color:var(--teal); }
-.page{ max-width: 720px; margin: 0 auto; padding: 56px 24px; }
+.page{ max-width: 860px; margin: 0 auto; padding: 48px 24px 64px; }
 .page h1{ font-family: var(--font-head); font-size:26px; color:var(--navy); margin:0 0 6px 0; }
 .page p.lede{ color:var(--muted); font-size:14px; margin:0 0 28px 0; }
 .card{ background:#fff; border:1px solid #E4EEEC; border-radius:12px; padding:22px 24px; }
+.card + .card{ margin-top:20px; }
 .card dl{ margin:0; display:grid; grid-template-columns: 140px 1fr; row-gap:12px; }
 .card dt{ font-size:12.5px; font-weight:700; color:var(--muted); }
 .card dd{ font-size:14px; color:var(--ink); margin:0; }
+.card h3{ margin:0 0 4px 0; font-family:var(--font-head); font-size:16px; color:var(--navy); }
+.card p.card-sub{ margin:0 0 16px 0; font-size:12.5px; color:var(--muted); }
 .role-badge{ display:inline-block; padding:3px 10px; border-radius:999px; background: var(--success-bg);
   color:#036B57; font-size:12px; font-weight:700; }
+.quick-actions{ display:flex; gap:10px; flex-wrap:wrap; }
+.quick-actions a.btn-primary{ width:auto; padding:10px 18px; }
+
+/* tables + badges (Volunteer Management and beyond) */
+.table-wrap{ overflow-x:auto; }
+.table{ width:100%; border-collapse:collapse; font-size:13px; }
+.table th{ text-align:left; font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase;
+  letter-spacing:0.4px; padding:8px 10px; border-bottom:1.5px solid #E4EEEC; white-space:nowrap; }
+.table td{ padding:10px; border-bottom:1px solid #EEF4F3; color:var(--ink); vertical-align:middle; }
+.table tr:last-child td{ border-bottom:none; }
+.badge{ display:inline-block; padding:3px 10px; border-radius:999px; font-size:11.5px; font-weight:700; white-space:nowrap; }
+.badge-verified{ background:var(--success-bg); color:#036B57; }
+.badge-pending{ background:var(--warn-bg); color:var(--warn-ink); }
+.badge-approved{ background:var(--success-bg); color:#036B57; }
+.badge-rejected{ background:var(--danger-bg); color:var(--danger); }
+.btn-small{ padding:6px 12px; font-size:12px; border-radius:6px; border:1.5px solid #DDE9E7; background:#fff;
+  color:var(--muted); cursor:pointer; font-weight:700; font-family:var(--font-body); }
+.btn-small:hover{ border-color:var(--teal); color:var(--teal); }
+.btn-small.primary{ background:var(--teal); border-color:var(--teal); color:#fff; }
+.btn-small.primary:hover{ background:#026a77; color:#fff; }
+.btn-small.danger{ border-color:var(--danger); color:var(--danger); }
+.btn-small.danger:hover{ background:var(--danger-bg); }
+.inline-form{ display:inline; }
+.search-row{ display:flex; flex-direction:row; align-items:center; gap:8px; margin-bottom:16px; }
+.search-input{ padding:9px 12px; border:1.5px solid #DDE9E7; border-radius:8px; font-size:13px; width:220px;
+  font-family:var(--font-body); }
+.skill-tag{ display:inline-block; background:var(--bg); color:var(--teal); padding:2px 8px; border-radius:6px;
+  font-size:11px; font-weight:700; margin:1px 3px 1px 0; }
+.empty-state{ padding:28px; text-align:center; color:var(--muted); font-size:13px; }
+.hint-text{ font-size:11.5px; color:var(--muted); margin-top:-6px; }
 `;
 
 const HEART_GLYPH = `<span class="glyph"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 21s-7.5-4.6-10-9.3C0.3 8.1 2 4.5 5.4 4c2-.3 3.7.6 4.9 2.1L12 8l1.7-1.9C15 4.6 16.7 3.7 18.6 4c3.4.5 5.1 4.1 3.4 7.7C19.5 16.4 12 21 12 21z" fill="#fff"/></svg></span>`;
@@ -228,8 +380,32 @@ const SNAPSHOT_HTML = `
     </div>
   </div>`;
 
+function topbar(activeLabel) {
+  return `
+  <div class="topbar">
+    <div class="brand-mark">${HEART_GLYPH}<span>NGO Management System</span></div>
+    <div class="topbar-right">
+      <a class="topbar-link" href="/dashboard">Dashboard</a>
+      <button class="btn-ghost" id="logoutBtn">Sign out</button>
+    </div>
+  </div>`;
+}
+
+const LOGOUT_SCRIPT = `
+<script>
+document.getElementById('logoutBtn').addEventListener('click', function(){
+  fetch('/api/logout', { method: 'POST' }).then(function(){ window.location.href = '/login'; });
+});
+</script>`;
+
+function escapeHtml(str) {
+  return String(str).replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  }[c]));
+}
+
 /* ============================================================
-   PAGE TEMPLATES
+   3. PAGE TEMPLATES
    ============================================================ */
 
 function loginPage() {
@@ -537,6 +713,20 @@ function registerPage() {
 }
 
 function dashboardPage(user) {
+  const isVolunteer = user.role === "Volunteer";
+  const isManager = user.role === "Project Manager" || user.role === "Super Admin";
+
+  let actions = "";
+  if (isVolunteer) {
+    actions += `<a class="btn-primary" href="/volunteer/profile">Go to volunteer profile</a>`;
+  }
+  if (isManager) {
+    actions += `<a class="btn-primary" href="/volunteers">Manage volunteers</a>`;
+  }
+  if (!actions) {
+    actions = `<p class="hint-text">No modules are available for your role yet.</p>`;
+  }
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -545,14 +735,12 @@ function dashboardPage(user) {
 <title>Dashboard · NGO Management System</title>
 <style>${SHARED_CSS}</style>
 </head>
-<body class="dashboard-body">
-  <div class="topbar">
-    <div class="brand-mark">${HEART_GLYPH}<span>NGO Management System</span></div>
-    <button class="btn-ghost" id="logoutBtn">Sign out</button>
-  </div>
+<body class="app-body">
+  ${topbar()}
   <div class="page">
     <h1>Welcome, ${escapeHtml(user.name.split(" ")[0])}</h1>
     <p class="lede">You're signed in. Here's what's on file for your account.</p>
+
     <div class="card">
       <dl>
         <dt>Name</dt><dd>${escapeHtml(user.name)}</dd>
@@ -560,28 +748,244 @@ function dashboardPage(user) {
         <dt>Role</dt><dd><span class="role-badge">${escapeHtml(user.role)}</span></dd>
       </dl>
     </div>
+
+    <div class="card">
+      <h3>Quick actions</h3>
+      <p class="card-sub">Jump into the module for your role.</p>
+      <div class="quick-actions">${actions}</div>
+    </div>
   </div>
-<script>
-document.getElementById('logoutBtn').addEventListener('click', function(){
-  fetch('/api/logout', { method: 'POST' }).then(function(){ window.location.href = '/login'; });
-});
-</script>
+${LOGOUT_SCRIPT}
 </body>
 </html>`;
 }
 
-function escapeHtml(str) {
-  return String(str).replace(/[&<>"']/g, (c) => ({
-    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
-  }[c]));
+function errorPage(title, message) {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>${escapeHtml(title)} · NGO Management System</title>
+<style>${SHARED_CSS}</style>
+</head>
+<body class="app-body">
+  ${topbar()}
+  <div class="page">
+    <h1>${escapeHtml(title)}</h1>
+    <p class="lede">${escapeHtml(message)}</p>
+    <a class="btn-primary" href="/dashboard" style="width:auto;display:inline-flex;align-self:flex-start;padding:10px 18px;">Back to dashboard</a>
+  </div>
+${LOGOUT_SCRIPT}
+</body>
+</html>`;
+}
+
+function volunteerProfilePage(user, volunteerRecord, hourLogs) {
+  const skills = volunteerRecord ? volunteerRecord.skills : "";
+  const verified = volunteerRecord && volunteerRecord.verifiedStatus === "Verified";
+  const skillTags = skills
+    ? skills.split(",").map((s) => s.trim()).filter(Boolean)
+      .map((s) => `<span class="skill-tag">${escapeHtml(s)}</span>`).join("")
+    : `<span class="hint-text">No skills on file yet.</span>`;
+
+  const rows = hourLogs.length
+    ? hourLogs.map((h) => `
+        <tr>
+          <td>${escapeHtml(h.taskName)}</td>
+          <td>${escapeHtml(h.hoursLogged)}</td>
+          <td>${escapeHtml(new Date(h.dateLogged).toLocaleDateString())}</td>
+          <td><span class="badge badge-${h.status.toLowerCase()}">${escapeHtml(h.status)}</span></td>
+        </tr>`).join("")
+    : `<tr><td colspan="4" class="empty-state">No hours logged yet.</td></tr>`;
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Volunteer Profile · NGO Management System</title>
+<style>${SHARED_CSS}</style>
+</head>
+<body class="app-body">
+  ${topbar()}
+  <div class="page">
+    <h1>Your volunteer profile</h1>
+    <p class="lede">Keep your skills up to date and log the hours you've put in.</p>
+
+    <div class="card">
+      <dl>
+        <dt>Name</dt><dd>${escapeHtml(user.name)}</dd>
+        <dt>Email</dt><dd>${escapeHtml(user.email)}</dd>
+        <dt>Status</dt><dd><span class="badge ${verified ? "badge-verified" : "badge-pending"}">${verified ? "Verified" : "Pending verification"}</span></dd>
+        <dt>Skills</dt><dd>${skillTags}</dd>
+      </dl>
+    </div>
+
+    <div class="card">
+      <h3>Update your skills</h3>
+      <p class="card-sub">Separate each skill with a comma — this is what project managers search by.</p>
+      <form method="POST" action="/volunteer/skills">
+        <div class="field">
+          <label for="skills">Skills</label>
+          <input type="text" id="skills" name="skills" placeholder="First aid, Event coordination, Teaching" value="${escapeHtml(skills)}" />
+        </div>
+        <button type="submit" class="btn-primary" style="width:auto;align-self:flex-start;padding:10px 18px;">Save skills</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h3>Log hours</h3>
+      <p class="card-sub">Submitted hours are reviewed by a project manager before they're approved.</p>
+      <form method="POST" action="/volunteer/hours">
+        <div class="field">
+          <label for="taskName">Task</label>
+          <input type="text" id="taskName" name="taskName" placeholder="Flood relief distribution" required />
+        </div>
+        <div class="field">
+          <label for="hoursLogged">Hours</label>
+          <input type="number" id="hoursLogged" name="hoursLogged" min="0.5" step="0.5" placeholder="3" required />
+        </div>
+        <button type="submit" class="btn-primary" style="width:auto;align-self:flex-start;padding:10px 18px;">Log hours</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h3>Your hour history</h3>
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Task</th><th>Hours</th><th>Date</th><th>Status</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+${LOGOUT_SCRIPT}
+</body>
+</html>`;
+}
+
+function volunteersAdminPage(user, volunteers, pendingHours, skillFilter) {
+  const volunteerRows = volunteers.length
+    ? volunteers.map((v) => {
+        const skillTags = v.skills
+          ? v.skills.split(",").map((s) => s.trim()).filter(Boolean)
+            .map((s) => `<span class="skill-tag">${escapeHtml(s)}</span>`).join("")
+          : `<span class="hint-text">—</span>`;
+        const verified = v.verifiedStatus === "Verified";
+        return `
+        <tr>
+          <td>${escapeHtml(v.name)}</td>
+          <td>${escapeHtml(v.email)}</td>
+          <td>${skillTags}</td>
+          <td><span class="badge ${verified ? "badge-verified" : "badge-pending"}">${verified ? "Verified" : "Pending"}</span></td>
+          <td>
+            <form class="inline-form" method="POST" action="/volunteers/${encodeURIComponent(v.userId)}/${verified ? "unverify" : "verify"}">
+              <button type="submit" class="btn-small ${verified ? "" : "primary"}">${verified ? "Unverify" : "Verify"}</button>
+            </form>
+          </td>
+        </tr>`;
+      }).join("")
+    : `<tr><td colspan="5" class="empty-state">No volunteers match this search.</td></tr>`;
+
+  const hourRows = pendingHours.length
+    ? pendingHours.map((h) => `
+        <tr>
+          <td>${escapeHtml(h.volunteerName)}</td>
+          <td>${escapeHtml(h.taskName)}</td>
+          <td>${escapeHtml(h.hoursLogged)}</td>
+          <td>${escapeHtml(new Date(h.dateLogged).toLocaleDateString())}</td>
+          <td>
+            <form class="inline-form" method="POST" action="/hours/${encodeURIComponent(h.id)}/approve">
+              <button type="submit" class="btn-small primary">Approve</button>
+            </form>
+            <form class="inline-form" method="POST" action="/hours/${encodeURIComponent(h.id)}/reject">
+              <button type="submit" class="btn-small danger">Reject</button>
+            </form>
+          </td>
+        </tr>`).join("")
+    : `<tr><td colspan="5" class="empty-state">No hours awaiting approval.</td></tr>`;
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Manage Volunteers · NGO Management System</title>
+<style>${SHARED_CSS}</style>
+</head>
+<body class="app-body">
+  ${topbar()}
+  <div class="page">
+    <h1>Manage volunteers</h1>
+    <p class="lede">Search by skill, verify volunteers, and approve logged hours.</p>
+
+    <div class="card">
+      <h3>All volunteers</h3>
+      <p class="card-sub">Search matches against each volunteer's listed skills.</p>
+      <form class="search-row" method="GET" action="/volunteers">
+        <input type="text" class="search-input" name="skill" placeholder="Search by skill, e.g. First aid" value="${escapeHtml(skillFilter || "")}" />
+        <button type="submit" class="btn-small primary">Search</button>
+        ${skillFilter ? `<a class="btn-small" href="/volunteers">Clear</a>` : ""}
+      </form>
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Name</th><th>Email</th><th>Skills</th><th>Status</th><th></th></tr></thead>
+          <tbody>${volunteerRows}</tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Pending hour approvals</h3>
+      <p class="card-sub">Approve or reject hours volunteers have logged.</p>
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Volunteer</th><th>Task</th><th>Hours</th><th>Date</th><th></th></tr></thead>
+          <tbody>${hourRows}</tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+${LOGOUT_SCRIPT}
+</body>
+</html>`;
 }
 
 /* ============================================================
-   APP / ROUTES
+   4. MIDDLEWARE
+   ============================================================ */
+
+function requireAuth(req, res, next) {
+  if (!req.session.userEmail) return res.redirect("/login");
+  const user = findUserByEmail(req.session.userEmail);
+  if (!user) return res.redirect("/login");
+  req.currentUser = user;
+  next();
+}
+
+function requireRole(...roles) {
+  return (req, res, next) => {
+    if (!roles.includes(req.currentUser.role)) {
+      return res.status(403).type("html").send(
+        errorPage("Access denied", "You don't have permission to view this page.")
+      );
+    }
+    next();
+  };
+}
+
+function isValidEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || "").trim());
+}
+
+/* ============================================================
+   5. APP / ROUTES
    ============================================================ */
 
 const app = express();
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use(session({
   name: "ngo.sid",
   secret: "ngo-management-system-demo-secret", // demo only — move to env var in production
@@ -590,22 +994,13 @@ app.use(session({
   cookie: { httpOnly: true, maxAge: 1000 * 60 * 60 * 8 },
 }));
 
-function isValidEmail(email) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || "").trim());
-}
-
-// ---------- Pages ----------
+/* ---------- Auth: pages ---------- */
 app.get("/", (req, res) => res.redirect("/login"));
 app.get("/login", (req, res) => res.type("html").send(loginPage()));
 app.get("/register", (req, res) => res.type("html").send(registerPage()));
-app.get("/dashboard", (req, res) => {
-  if (!req.session.userEmail) return res.redirect("/login");
-  const user = findUserByEmail(req.session.userEmail);
-  if (!user) return res.redirect("/login");
-  res.type("html").send(dashboardPage(user));
-});
+app.get("/dashboard", requireAuth, (req, res) => res.type("html").send(dashboardPage(req.currentUser)));
 
-// ---------- API: Register ----------
+/* ---------- Auth: API ---------- */
 app.post("/api/register", async (req, res) => {
   try {
     const { name, email, password, confirmPassword, role } = req.body || {};
@@ -641,7 +1036,6 @@ app.post("/api/register", async (req, res) => {
   }
 });
 
-// ---------- API: Login ----------
 app.post("/api/login", async (req, res) => {
   try {
     const { email, password, remember } = req.body || {};
@@ -667,7 +1061,6 @@ app.post("/api/login", async (req, res) => {
   }
 });
 
-// ---------- API: Current session ----------
 app.get("/api/me", (req, res) => {
   if (!req.session.userEmail) return res.status(401).json({ error: "Not signed in." });
   const user = findUserByEmail(req.session.userEmail);
@@ -675,7 +1068,6 @@ app.get("/api/me", (req, res) => {
   return res.json({ user: { name: user.name, email: user.email, role: user.role } });
 });
 
-// ---------- API: Logout ----------
 app.post("/api/logout", (req, res) => {
   req.session.destroy(() => {
     res.clearCookie("ngo.sid");
@@ -683,8 +1075,60 @@ app.post("/api/logout", (req, res) => {
   });
 });
 
+/* ---------- Volunteer Management: self-service (role: Volunteer) ---------- */
+
+app.get("/volunteer/profile", requireAuth, requireRole("Volunteer"), (req, res) => {
+  const volunteerRecord = findVolunteerByUserId(req.currentUser.id);
+  const hourLogs = listHoursForVolunteer(req.currentUser.id);
+  res.type("html").send(volunteerProfilePage(req.currentUser, volunteerRecord, hourLogs));
+});
+
+app.post("/volunteer/skills", requireAuth, requireRole("Volunteer"), (req, res) => {
+  const skills = String(req.body.skills || "").trim();
+  upsertVolunteerSkills(req.currentUser.id, skills);
+  res.redirect("/volunteer/profile");
+});
+
+app.post("/volunteer/hours", requireAuth, requireRole("Volunteer"), (req, res) => {
+  const taskName = String(req.body.taskName || "").trim();
+  const hoursLogged = parseFloat(req.body.hoursLogged);
+  if (taskName && hoursLogged > 0) {
+    logHours(req.currentUser.id, taskName, hoursLogged);
+  }
+  res.redirect("/volunteer/profile");
+});
+
+/* ---------- Volunteer Management: admin (role: Project Manager, Super Admin) ---------- */
+
+app.get("/volunteers", requireAuth, requireRole("Project Manager", "Super Admin"), (req, res) => {
+  const skillFilter = req.query.skill ? String(req.query.skill) : "";
+  const volunteers = listVolunteers(skillFilter);
+  const pendingHours = listPendingHours();
+  res.type("html").send(volunteersAdminPage(req.currentUser, volunteers, pendingHours, skillFilter));
+});
+
+app.post("/volunteers/:id/verify", requireAuth, requireRole("Project Manager", "Super Admin"), (req, res) => {
+  setVolunteerVerified(req.params.id, true);
+  res.redirect("/volunteers");
+});
+
+app.post("/volunteers/:id/unverify", requireAuth, requireRole("Project Manager", "Super Admin"), (req, res) => {
+  setVolunteerVerified(req.params.id, false);
+  res.redirect("/volunteers");
+});
+
+app.post("/hours/:id/approve", requireAuth, requireRole("Project Manager", "Super Admin"), (req, res) => {
+  setHourStatus(req.params.id, "Approved", req.currentUser.email);
+  res.redirect("/volunteers");
+});
+
+app.post("/hours/:id/reject", requireAuth, requireRole("Project Manager", "Super Admin"), (req, res) => {
+  setHourStatus(req.params.id, "Rejected", req.currentUser.email);
+  res.redirect("/volunteers");
+});
+
 app.listen(PORT, () => {
-  console.log(`NGO Management System auth module running at http://localhost:${PORT}`);
+  console.log(`NGO Management System running at http://localhost:${PORT}`);
   console.log(`Open http://localhost:${PORT}/login to sign in.`);
-  console.log(`User records are stored in data/users.csv`);
+  console.log(`Data is stored in the data/ folder (users.csv, volunteers.csv, volunteer_hours.csv)`);
 });
