@@ -258,15 +258,15 @@ async function listRecentBeneficiaries(limit) {
 
 const SHARED_CSS = `
 :root{
-  --navy:#05374D; --navy-2:#072F42; --teal:#028090; --seafoam:#00A896; --mint:#02C39A;
-  --ink:#12262B; --muted:#5B7373; --muted-2:#8FA6A6; --bg:#F1F7F6; --white:#FFFFFF;
+  --navy:#16382D; --navy-2:#0B241B; --teal:#187D72; --seafoam:#5AAE8C; --mint:#B9D99A;
+  --ink:#1C2822; --muted:#65756C; --muted-2:#99A59D; --bg:#F7F5EE; --white:#FFFFFF;
   --danger:#B3261E; --danger-bg:#FCEEEC; --success-bg:#E8F6F3; --warn-bg:#FFF4E0; --warn-ink:#8A5A00;
   --border:#E4EEEC; --ring: rgba(2,128,144,0.35);
-  --font-head: Cambria, "Times New Roman", Georgia, serif;
-  --font-body: Calibri, "Segoe UI", Arial, sans-serif;
-  --radius: 10px;
-  --shadow-sm: 0 1px 2px rgba(5,55,77,0.06);
-  --shadow-md: 0 8px 24px -8px rgba(5,55,77,0.18);
+  --font-head: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-body: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --radius: 14px;
+  --shadow-sm: 0 2px 4px rgba(22,56,45,0.05);
+  --shadow-md: 0 16px 36px -18px rgba(22,56,45,0.25);
 }
 *{ box-sizing:border-box; }
 html,body{ margin:0; padding:0; }
@@ -563,13 +563,14 @@ function landingPage() {
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>NGO Management System</title>
-<style>${SHARED_CSS}</style>
+<title>ABC Foundation · Empowering Communities</title>
+<style>${SHARED_CSS}
+.public{background:#f7f5ee}.site-header{background:rgba(255,253,248,.92);border:0}.site-header-inner{max-width:1240px;padding:17px 28px}.site-brand .glyph{background:#e67858;border-radius:50%}.site-brand span{color:var(--navy);font-size:14px;letter-spacing:.08em}.site-nav a{color:#40564a}.site-nav-actions .btn-outline{color:var(--navy);border-color:#cad7c9}.site-nav-actions .btn-outline:hover{background:#edf3e8}.hero{background:#edf2e8;min-height:625px}.hero:before{width:650px;height:650px;background:#dcebd5;top:-100px;right:-130px}.hero-inner{max-width:1240px;padding:72px 28px;grid-template-columns:.92fr 1.08fr;gap:66px}.hero-eyebrow,.section-eyebrow{color:#c76246;font-size:11px}.hero h1{color:#17392e;font-size:clamp(40px,5vw,66px);letter-spacing:-.055em;line-height:1.02}.hero p.lede{color:#52675b;font-size:17px}.btn-primary{background:#d9684b;border-radius:999px;padding:13px 22px;box-shadow:0 8px 15px -10px #873d2b}.btn-primary:hover{background:#ba553c}.btn-outline{border-radius:999px;color:#17392e;border-color:#a9bda8}.btn-outline:hover{background:rgba(255,255,255,.58)}.hero-visual{position:relative;background:none;border:0;padding:0}.hero-photo{height:465px;width:100%;object-fit:cover;border-radius:44% 44% 16px 16px;box-shadow:0 28px 40px -25px rgba(20,55,42,.55)}.float-card{position:absolute;background:#fff;padding:14px 16px;border-radius:14px;box-shadow:var(--shadow-md);font-size:12px;color:#486052;line-height:1.35}.float-card strong{display:block;color:#17392e;font-size:14px;margin-bottom:3px}.float-one{left:-32px;bottom:60px}.float-two{right:-16px;top:36px;background:#17392e;color:#d8e9d2}.float-two strong{color:#fff}.section{max-width:1240px;padding:95px 28px}.section-head h2{font-size:38px;letter-spacing:-.045em;color:#17392e}.mission{display:grid;grid-template-columns:1fr 1fr;gap:72px;align-items:center}.mission-img{height:440px;width:100%;object-fit:cover;border-radius:16px 16px 120px 16px}.mission-copy h2{font-size:42px;letter-spacing:-.05em;line-height:1.08;margin:0 0 18px;color:#17392e}.mission-copy p{font-size:16px;color:var(--muted);line-height:1.7;margin-bottom:25px}.impact{background:#17392e;color:#fff}.impact .section-head h2{color:#fff}.impact .section-head p{color:#bed0c0}.impact-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:rgba(255,255,255,.18)}.impact-item{background:#17392e;padding:28px}.impact-item svg{width:28px;color:#d4df9a;margin-bottom:22px}.impact-item h3{font-size:15px;letter-spacing:.04em;margin:0 0 8px}.impact-item p{font-size:13px;color:#b8cbbd;line-height:1.55;margin:0}.work-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}.work-card{position:relative;min-height:350px;border-radius:16px;overflow:hidden;color:#fff}.work-card img{width:100%;height:100%;object-fit:cover;position:absolute;transition:transform .45s ease}.work-card:hover img{transform:scale(1.06)}.work-card:after{content:'';position:absolute;inset:0;background:linear-gradient(transparent 25%,rgba(11,35,27,.82))}.work-card div{position:absolute;z-index:1;bottom:0;padding:22px}.work-card h3{margin:0 0 7px;font-size:19px}.work-card p{font-size:12.5px;line-height:1.45;margin:0;color:#e7f0e4}.cap-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:22px}.cap-card{background:#fff;border-radius:16px;overflow:hidden;box-shadow:var(--shadow-sm);border:1px solid #e8ebe2}.cap-card img{height:175px;width:100%;object-fit:cover}.cap-card div{padding:21px}.cap-card h3{color:#17392e;margin:0 0 8px;font-size:18px}.cap-card p{color:var(--muted);font-size:13px;line-height:1.55;margin:0}.photo-cta{max-width:none;padding:0;position:relative;min-height:410px;display:flex;align-items:center;justify-content:center;text-align:center;background:linear-gradient(rgba(10,35,26,.68),rgba(10,35,26,.68)),url('https://images.unsplash.com/photo-1559027615-cd4628902d4a?auto=format&fit=crop&w=1800&q=85') center/cover}.photo-cta div{color:#fff;max-width:650px;padding:60px 24px}.photo-cta h2{font-size:44px;letter-spacing:-.05em;margin:0 0 13px}.photo-cta p{font-size:17px;color:#e2eee1;margin:0 0 26px}.gallery{display:grid;grid-template-columns:1.3fr .8fr .8fr;grid-template-rows:200px 200px;gap:14px}.gallery img{width:100%;height:100%;object-fit:cover;border-radius:12px;transition:transform .3s}.gallery img:hover{transform:scale(1.02)}.gallery img:first-child{grid-row:span 2}.involved{background:#f0eee4}.involved-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}.involved-card{background:#fff;padding:27px;border-radius:16px}.involved-card small{color:#c76246;font-weight:800;letter-spacing:.1em}.involved-card h3{font-size:22px;color:#17392e;margin:12px 0 9px}.involved-card p{font-size:13px;color:var(--muted);margin:0 0 18px}.footer-grid{max-width:1240px;margin:auto;padding:55px 28px 24px;display:grid;grid-template-columns:2fr 1fr 1fr;gap:32px}.site-footer{background:#102d23}.site-footer h4{color:#fff;margin:0 0 13px;font-size:12px;letter-spacing:.1em}.site-footer a{display:block;color:#b9caba;text-decoration:none;font-size:13px;margin:8px 0}.site-footer-inner{max-width:1240px;border-top:1px solid rgba(255,255,255,.13);padding:20px 28px}.site-footer .site-brand span{font-size:14px}.mobile-menu{display:none}@media(max-width:900px){.hero-inner,.mission{grid-template-columns:1fr;gap:38px}.hero-visual{max-width:600px}.work-grid{grid-template-columns:repeat(2,1fr)}.cap-grid{grid-template-columns:1fr}.site-nav{display:none}.nav-toggle-btn{display:inline-flex}.mobile-menu{display:none;position:absolute;left:0;right:0;top:69px;background:#fff;padding:18px 28px;box-shadow:var(--shadow-md)}.mobile-menu.open{display:block}.mobile-menu a{display:block;padding:10px 0;text-decoration:none;color:#17392e;font-weight:700}.impact-grid,.involved-grid{grid-template-columns:1fr}.footer-grid{grid-template-columns:1fr 1fr}.hero-photo{height:380px}}@media(max-width:560px){.site-header-inner{padding:14px 18px}.site-nav-actions .btn-outline{display:none}.hero-inner,.section{padding-left:18px;padding-right:18px}.hero h1{font-size:42px}.work-grid{grid-template-columns:1fr}.gallery{grid-template-columns:1fr 1fr;grid-template-rows:150px 150px}.photo-cta h2{font-size:34px}.footer-grid{grid-template-columns:1fr}.float-one{left:8px}.float-two{right:8px}}</style>
 </head>
-<body>
+<body class="public">
   <header class="site-header">
     <div class="site-header-inner">
-      <a class="site-brand" href="/">${HEART_GLYPH}<span>NGO Management System</span></a>
+      <a class="site-brand" href="/">${HEART_GLYPH}<span>ABC FOUNDATION</span></a>
       <nav class="site-nav">
         <a href="/">Home</a>
         <a href="#about">About</a>
@@ -580,79 +581,43 @@ function landingPage() {
         <a class="btn-outline dark" href="/login">Login</a>
         <a class="btn-primary" href="/register">Register</a>
       </div>
+      <button class="nav-toggle-btn" id="menuBtn" aria-label="Open navigation">☰</button>
     </div>
+    <nav class="mobile-menu" id="mobileMenu"><a href="#about">About</a><a href="#our-work">Our Work</a><a href="#get-involved">Get Involved</a></nav>
   </header>
 
   <section class="hero" id="about">
     <div class="hero-inner">
       <div>
-        <p class="hero-eyebrow">NGO Management System</p>
-        <h1>Empowering Communities Through Action</h1>
-        <p class="lede">We connect volunteers, staff, and the communities they support through one centralized
-          platform — built to make coordination simple and every contribution accountable.</p>
+        <p class="hero-eyebrow">Community • Compassion • Action</p>
+        <h1>Empowering Communities.<br/>Creating Lasting Change.</h1>
+        <p class="lede">ABC Foundation brings people, skills and community support together to create meaningful change.</p>
         <div class="hero-actions">
           <a class="btn-primary" href="/register?role=Volunteer">Become a Volunteer</a>
-          <a class="btn-outline" href="/login">Login</a>
+          <a class="btn-outline" href="#our-work">Explore Our Work</a>
         </div>
       </div>
-      <div class="hero-visual">
-        <div class="hero-stat-grid">
-          <div class="hero-stat"><b>Registered</b><span>Volunteers build a profile, list their skills, and log hours in one place.</span></div>
-          <div class="hero-stat"><b>Verified</b><span>Every volunteer is verified by staff before hours are approved.</span></div>
-          <div class="hero-stat"><b>Tracked</b><span>Beneficiary support and aid history stay organized and searchable.</span></div>
-          <div class="hero-stat"><b>Secure</b><span>Role-based access keeps sensitive records with authorized staff only.</span></div>
-        </div>
-      </div>
+      <div class="hero-visual"><img class="hero-photo" alt="Volunteers supporting a community" src="https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?auto=format&fit=crop&w=1100&q=85"/><div class="float-card float-one"><strong>♥ Community first</strong>Making every effort count.</div><div class="float-card float-two"><strong>Volunteer powered</strong>People moving change forward.</div></div>
     </div>
   </section>
 
+  <section class="section mission" id="about"><img class="mission-img" alt="Community learning together" src="https://images.unsplash.com/photo-1497486751825-1233686d5d80?auto=format&fit=crop&w=1000&q=85"/><div class="mission-copy"><p class="section-eyebrow">Our mission</p><h2>Change begins when people come together.</h2><p>We create the space for committed people and communities to work side by side. Our platform helps the work behind the work stay thoughtful, secure and connected.</p><a class="btn-primary" href="#our-work">Learn More</a></div></section>
+  <section class="impact"><div class="section"><div class="section-head"><p class="section-eyebrow">Built for meaningful work</p><h2>Impact you can trust.</h2><p>Capabilities that bring clarity and care to community support.</p></div><div class="impact-grid"><div class="impact-item">${ICONS.volunteers}<h3>VOLUNTEERS</h3><p>Organized and verified volunteer profiles.</p></div><div class="impact-item">${ICONS.beneficiaries}<h3>BENEFICIARIES</h3><p>Secure community support records.</p></div><div class="impact-item">${ICONS.auth}<h3>SUPPORT HISTORY</h3><p>Complete aid history tracking.</p></div></div></div></section>
   <section class="section" id="our-work">
     <div class="section-head">
-      <p class="section-eyebrow">What's live today</p>
-      <h2>One system, built module by module</h2>
-      <p>These are the parts of the platform that are up and running right now.</p>
+      <p class="section-eyebrow">Our work</p><h2>Where compassion becomes action.</h2><p>A glimpse of the community-focused work that inspires us.</p>
     </div>
-    <div class="feature-grid">
-      <div class="feature-card">
-        <div class="icon">${ICONS.volunteers}</div>
-        <h3>Volunteer Management</h3>
-        <ul>
-          <li>Manage volunteer profiles</li>
-          <li>Track skills</li>
-          <li>Track working hours</li>
-          <li>Verification and approval</li>
-        </ul>
-      </div>
-      <div class="feature-card">
-        <div class="icon">${ICONS.beneficiaries}</div>
-        <h3>Beneficiary Management</h3>
-        <ul>
-          <li>Maintain beneficiary records</li>
-          <li>Search beneficiaries</li>
-          <li>Track support provided</li>
-          <li>Maintain aid history</li>
-          <li>Prevent duplicate records</li>
-        </ul>
-      </div>
-      <div class="feature-card">
-        <div class="icon">${ICONS.auth}</div>
-        <h3>Secure Authentication</h3>
-        <ul>
-          <li>Registration</li>
-          <li>Login</li>
-          <li>Sessions</li>
-          <li>Role-based access</li>
-        </ul>
-      </div>
-    </div>
+    <div class="work-grid"><article class="work-card"><img alt="Community support" src="https://images.unsplash.com/photo-1489493585363-d694e8a1035e?auto=format&fit=crop&w=700&q=85"/><div><h3>Community Support</h3><p>Helping neighbourhoods build stronger foundations.</p></div></article><article class="work-card"><img alt="Education support" src="https://images.unsplash.com/photo-1509062522246-3755977927d7?auto=format&fit=crop&w=700&q=85"/><div><h3>Education</h3><p>Creating pathways for learning and opportunity.</p></div></article><article class="work-card"><img alt="Healthcare outreach" src="https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=700&q=85"/><div><h3>Healthcare</h3><p>Care that reaches people where they are.</p></div></article><article class="work-card"><img alt="Environmental community action" src="https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?auto=format&fit=crop&w=700&q=85"/><div><h3>Environmental Action</h3><p>Growing a more resilient future together.</p></div></article></div>
   </section>
+
+  <section class="section"><div class="section-head"><p class="section-eyebrow">Powering our people</p><h2>The platform capabilities live today.</h2></div><div class="cap-grid"><article class="cap-card"><img alt="Volunteers collaborating" src="https://images.unsplash.com/photo-1559027615-cd4628902d4a?auto=format&fit=crop&w=700&q=85"/><div><h3>Volunteer Management</h3><p>Manage profiles, skills, verification and working hours in one place.</p></div></article><article class="cap-card"><img alt="Community support in action" src="https://images.unsplash.com/photo-1469571486292-0ba58a3f068b?auto=format&fit=crop&w=700&q=85"/><div><h3>Beneficiary Management</h3><p>Securely maintain beneficiary records and track support provided over time.</p></div></article><article class="cap-card"><img alt="Secure abstract visual" src="https://images.unsplash.com/photo-1563013544-824ae1b704d3?auto=format&fit=crop&w=700&q=85"/><div><h3>Secure Access</h3><p>Role-based access keeps sensitive information with authorized users.</p></div></article></div></section>
+  <section class="photo-cta"><div><h2>Your Skills Can Make a Difference.</h2><p>Join the ABC Foundation volunteer community.</p><a class="btn-primary" href="/register?role=Volunteer">Become a Volunteer</a></div></section>
+  <section class="section"><div class="section-head"><p class="section-eyebrow">Our work in action</p><h2>People make every moment matter.</h2></div><div class="gallery"><img alt="Volunteers outdoors" src="https://images.unsplash.com/photo-1556484687-30636164638b?auto=format&fit=crop&w=900&q=85"/><img alt="Community gathering" src="https://images.unsplash.com/photo-1531482615713-2afd69097998?auto=format&fit=crop&w=600&q=85"/><img alt="Volunteers together" src="https://images.unsplash.com/photo-1559027615-cd4628902d4a?auto=format&fit=crop&w=600&q=85"/><img alt="Children learning" src="https://images.unsplash.com/photo-1497633762265-9d179a990aa6?auto=format&fit=crop&w=600&q=85"/><img alt="Helping hands" src="https://images.unsplash.com/photo-1531206715517-5c0ba140b2b8?auto=format&fit=crop&w=600&q=85"/></div></section>
 
   <section class="coming-soon">
     <div class="section" style="padding:56px 24px;">
       <div class="section-head" style="margin-bottom:32px;">
-        <p class="section-eyebrow">What's next</p>
-        <h2>Coming soon</h2>
-        <p>These modules are part of the roadmap and aren't available yet.</p>
+        <p class="section-eyebrow">More ways to create impact</p><h2>Coming soon</h2><p>Our platform is designed to grow with the work.</p>
       </div>
       <div class="coming-soon-grid">
         <div class="coming-soon-card"><div class="dot"></div><span>Project Monitoring</span><br/><span class="coming-soon-tag">Planned</span></div>
@@ -663,22 +628,13 @@ function landingPage() {
     </div>
   </section>
 
-  <section class="section" id="get-involved" style="text-align:center; padding-bottom:96px;">
-    <p class="section-eyebrow">Get involved</p>
-    <h2 style="font-family:var(--font-head); font-size:28px; color:var(--navy); margin:0 0 14px 0;">Ready to help out?</h2>
-    <p style="font-size:14.5px; color:var(--muted); max-width:480px; margin:0 auto 28px;">Create an account as a volunteer, donor, or community member — it only takes a minute.</p>
-    <div class="hero-actions" style="justify-content:center;">
-      <a class="btn-primary" href="/register">Create an account</a>
-      <a class="btn-outline dark" href="/login">Login</a>
-    </div>
-  </section>
+  <section class="involved" id="get-involved"><div class="section"><div class="section-head"><p class="section-eyebrow">Get involved</p><h2>There is a place for everyone.</h2></div><div class="involved-grid"><article class="involved-card"><small>VOLUNTEER</small><h3>Give your time and skills.</h3><p>Bring your care and experience to work that matters.</p><a class="link" href="/register?role=Volunteer">Become a volunteer →</a></article><article class="involved-card"><small>SUPPORT</small><h3>Stand with communities.</h3><p>More ways to help will be available soon.</p><span class="coming-soon-tag">Coming soon</span></article><article class="involved-card"><small>PARTNER</small><h3>Work together for impact.</h3><p>Partnership opportunities are coming soon.</p><span class="coming-soon-tag">Coming soon</span></article></div></div></section>
+  <section class="photo-cta"><div><h2>Change starts with people.</h2><p>Be part of something bigger than yourself.</p><a class="btn-primary" href="/register">Join ABC Foundation</a></div></section>
 
   <footer class="site-footer">
-    <div class="site-footer-inner">
-      <a class="site-brand" href="/">${HEART_GLYPH}<span>NGO Management System</span></a>
-      <p>&copy; ${new Date().getFullYear()} NGO Management System. Built for communities, by volunteers.</p>
-    </div>
+    <div class="footer-grid"><div><a class="site-brand" href="/">${HEART_GLYPH}<span>ABC FOUNDATION</span></a><p>Empowering Communities. Creating Lasting Change.</p></div><div><h4>EXPLORE</h4><a href="/">Home</a><a href="#about">About</a><a href="#our-work">Our Work</a><a href="#get-involved">Get Involved</a></div><div><h4>PLATFORM</h4><a href="/login">Login</a><a href="/register">Register</a><a href="#">Projects — Coming Soon</a><a href="#">Donations — Coming Soon</a></div></div><div class="site-footer-inner"><p>© 2026 ABC Foundation</p></div>
   </footer>
+<script>document.getElementById('menuBtn').addEventListener('click',function(){document.getElementById('mobileMenu').classList.toggle('open')})</script>
 </body>
 </html>`;
 }
@@ -690,11 +646,11 @@ function loginPage() {
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Sign In · NGO Management System</title>
+<title>Sign In · ABC Foundation</title>
 <style>${SHARED_CSS}
 .auth-shell{ min-height:100vh; display:flex; }
 .auth-brand{ flex:1 1 0; min-width:0; position:relative; overflow:hidden;
-  background: linear-gradient(165deg, var(--navy) 0%, var(--navy-2) 60%, #062A3A 100%);
+  background: linear-gradient(165deg,rgba(11,36,27,.84),rgba(11,36,27,.7)),url('https://images.unsplash.com/photo-1532629345422-7515f3d16bb6?auto=format&fit=crop&w=1200&q=85') center/cover;
   color:#fff; padding:48px 44px; display:flex; flex-direction:column; justify-content:space-between; }
 .auth-brand::before{ content:""; position:absolute; width:320px; height:320px; border-radius:50%;
   background: radial-gradient(circle at 30% 30%, rgba(0,168,150,0.5), rgba(0,168,150,0) 70%); top:-140px; right:-110px; }
@@ -720,9 +676,9 @@ function loginPage() {
 <div class="auth-shell">
   <aside class="auth-brand">
     <div class="auth-brand-top">
-      <a class="brand-mark" href="/">${HEART_GLYPH}<span>NGO Management System</span></a>
-      <h1>Welcome back to the platform that keeps your work organized.</h1>
-      <p>Sign in to manage volunteers, beneficiaries, and the programs you run.</p>
+      <a class="brand-mark" href="/">${HEART_GLYPH}<span>ABC FOUNDATION</span></a>
+      <h1>Together, we can create change.</h1>
+      <p>Sign in to coordinate the people and support that move communities forward.</p>
     </div>
     <p class="auth-brand-foot">Role-based access keeps every account limited to what it needs.</p>
   </aside>
@@ -857,11 +813,11 @@ function registerPage(presetRole) {
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Create Account · NGO Management System</title>
+<title>Join ABC Foundation</title>
 <style>${SHARED_CSS}
 .auth-shell{ min-height:100vh; display:flex; }
 .auth-brand{ flex:1 1 0; min-width:0; position:relative; overflow:hidden;
-  background: linear-gradient(165deg, var(--navy) 0%, var(--navy-2) 60%, #062A3A 100%);
+  background: linear-gradient(165deg,rgba(11,36,27,.84),rgba(11,36,27,.7)),url('https://images.unsplash.com/photo-1559027615-cd4628902d4a?auto=format&fit=crop&w=1200&q=85') center/cover;
   color:#fff; padding:48px 44px; display:flex; flex-direction:column; justify-content:space-between; }
 .auth-brand::before{ content:""; position:absolute; width:320px; height:320px; border-radius:50%;
   background: radial-gradient(circle at 30% 30%, rgba(0,168,150,0.5), rgba(0,168,150,0) 70%); top:-140px; right:-110px; }
@@ -886,15 +842,15 @@ function registerPage(presetRole) {
 <div class="auth-shell">
   <aside class="auth-brand">
     <div class="auth-brand-top">
-      <a class="brand-mark" href="/">${HEART_GLYPH}<span>NGO Management System</span></a>
-      <h1>Join the platform that keeps every contribution accountable.</h1>
-      <p>Create an account to volunteer, donate, or track programs.</p>
+      <a class="brand-mark" href="/">${HEART_GLYPH}<span>ABC FOUNDATION</span></a>
+      <h1>Join the community.</h1>
+      <p>Bring your energy, skills and care to meaningful community action.</p>
     </div>
   </aside>
   <section class="auth-form">
     <div class="auth-form-inner">
-      <h2>Create account</h2>
-      <p class="sub">It only takes a minute.</p>
+      <h2>Create your account</h2>
+      <p class="sub">It only takes a minute to get involved.</p>
       <div class="alert alert-error banner error" id="banner"></div>
       <form id="registerForm" class="stack" novalidate>
         <div class="field" id="nameField">
@@ -1037,16 +993,16 @@ function registerPage(presetRole) {
 function sidebarLinks(role) {
   if (role === "Volunteer") {
     return [
-      { key: "dashboard", href: "/dashboard", label: "Dashboard" },
-      { key: "profile", href: "/volunteer/profile", label: "My Profile" },
-      { key: "hours", href: "/volunteer/profile#hours", label: "My Hours" },
+      { key: "dashboard", href: "/dashboard", label: "⌂  Dashboard" },
+      { key: "profile", href: "/volunteer/profile", label: "◉  My Profile" },
+      { key: "hours", href: "/volunteer/profile#hours", label: "◷  My Hours" },
     ];
   }
   // Project Manager, Super Admin
   return [
-    { key: "dashboard", href: "/dashboard", label: "Dashboard" },
-    { key: "volunteers", href: "/volunteers", label: "Volunteers" },
-    { key: "beneficiaries", href: "/beneficiaries", label: "Beneficiaries" },
+    { key: "dashboard", href: "/dashboard", label: "⌂  Dashboard" },
+    { key: "volunteers", href: "/volunteers", label: "♙  Volunteers" },
+    { key: "beneficiaries", href: "/beneficiaries", label: "♡  Beneficiaries" },
   ];
 }
 
@@ -1061,14 +1017,14 @@ function appShell(user, activeNav, innerHtml, titleSuffix) {
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>${escapeHtml(titleSuffix || "Dashboard")} · NGO Management System</title>
+<title>${escapeHtml(titleSuffix || "Dashboard")} · ABC Foundation</title>
 <style>${SHARED_CSS}</style>
 </head>
 <body class="app-body">
   <div class="app-shell">
     <input type="checkbox" id="navToggle" class="nav-toggle" />
     <aside class="sidebar">
-      <div class="sidebar-brand">${HEART_GLYPH}<span>NGO Management</span></div>
+      <div class="sidebar-brand">${HEART_GLYPH}<span>ABC FOUNDATION</span></div>
       <div class="sidebar-role-tag">${escapeHtml(user.role)}</div>
       ${navHtml}
       <div class="sidebar-spacer"></div>
