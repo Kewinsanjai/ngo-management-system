@@ -203,6 +203,55 @@ async function listAidForBeneficiary(beneficiaryId) {
   return res.rows;
 }
 
+// ---- Project Monitoring ----
+async function listProjects(search) {
+  const res = await query(
+    `SELECT p.project_id AS "projectId", p.name, p.description, p.location, p.status, p.progress,
+            p.start_date AS "startDate", p.end_date AS "endDate", p.created_at AS "createdAt",
+            u.name AS "createdByName"
+     FROM projects p JOIN users u ON u.id = p.created_by
+     WHERE ($1 = '' OR p.name ILIKE '%' || $1 || '%' OR p.location ILIKE '%' || $1 || '%')
+     ORDER BY p.updated_at DESC, p.created_at DESC`,
+    [search || ""]
+  );
+  return res.rows;
+}
+
+async function createProject({ name, description, location, status, progress, startDate, endDate, createdBy }) {
+  const res = await query(
+    `INSERT INTO projects (name, description, location, status, progress, start_date, end_date, created_by)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+     RETURNING project_id AS "projectId"`,
+    [name, description, location, status, progress, startDate || null, endDate || null, createdBy]
+  );
+  return res.rows[0];
+}
+
+async function findProjectById(id) {
+  const res = await query(
+    `SELECT p.project_id AS "projectId", p.name, p.description, p.location, p.status, p.progress,
+            p.start_date AS "startDate", p.end_date AS "endDate", p.created_at AS "createdAt", u.name AS "createdByName"
+     FROM projects p JOIN users u ON u.id = p.created_by WHERE p.project_id = $1`, [id]
+  );
+  return res.rows[0] || null;
+}
+
+async function listProjectUpdates(projectId) {
+  const res = await query(
+    `SELECT id, note, progress, status, recorded_by AS "recordedBy", created_at AS "createdAt"
+     FROM project_updates WHERE project_id = $1 ORDER BY created_at DESC`, [projectId]
+  );
+  return res.rows;
+}
+
+async function addProjectUpdate(projectId, { note, progress, status, recordedBy }) {
+  await query(
+    `INSERT INTO project_updates (project_id, note, progress, status, recorded_by) VALUES ($1,$2,$3,$4,$5)`,
+    [projectId, note, progress, status, recordedBy]
+  );
+  await query(`UPDATE projects SET progress = $2, status = $3, updated_at = now() WHERE project_id = $1`, [projectId, progress, status]);
+}
+
 // ---- Dashboard summary (Super Admin / Project Manager) ----
 // Read-only aggregates over existing tables — no schema changes, no new routes.
 async function getVolunteerStats() {
@@ -620,7 +669,6 @@ function landingPage() {
         <p class="section-eyebrow">More ways to create impact</p><h2>Coming soon</h2><p>Our platform is designed to grow with the work.</p>
       </div>
       <div class="coming-soon-grid">
-        <div class="coming-soon-card"><div class="dot"></div><span>Project Monitoring</span><br/><span class="coming-soon-tag">Planned</span></div>
         <div class="coming-soon-card"><div class="dot"></div><span>Donation Processing</span><br/><span class="coming-soon-tag">Planned</span></div>
         <div class="coming-soon-card"><div class="dot"></div><span>Fundraising Campaigns</span><br/><span class="coming-soon-tag">Planned</span></div>
         <div class="coming-soon-card"><div class="dot"></div><span>Financial Transparency</span><br/><span class="coming-soon-tag">Planned</span></div>
@@ -1001,6 +1049,7 @@ function sidebarLinks(role) {
   // Project Manager, Super Admin
   return [
     { key: "dashboard", href: "/dashboard", label: "⌂  Dashboard" },
+    { key: "projects", href: "/projects", label: "◫  Projects" },
     { key: "volunteers", href: "/volunteers", label: "♙  Volunteers" },
     { key: "beneficiaries", href: "/beneficiaries", label: "♡  Beneficiaries" },
   ];
@@ -1472,6 +1521,39 @@ function beneficiaryDetailPage(user, beneficiary, aidLog) {
   return appShell(user, "beneficiaries", content, escapeHtml(beneficiary.fullName));
 }
 
+/* ---------- Project Monitoring ---------- */
+const PROJECT_STATUSES = ["Planned", "Active", "On Hold", "Completed"];
+
+function projectStatusClass(status) {
+  return status === "Completed" ? "badge-verified" : status === "On Hold" ? "badge-rejected" : status === "Active" ? "badge-approved" : "badge-pending";
+}
+
+function projectListPage(user, projects, search) {
+  const rows = projects.length ? projects.map((p) => `
+    <tr><td><strong>${escapeHtml(p.name)}</strong><br/><span class="hint-text">${escapeHtml(p.description || "No description")}</span></td>
+    <td>${escapeHtml(p.location || "—")}</td><td><span class="badge ${projectStatusClass(p.status)}">${escapeHtml(p.status)}</span></td>
+    <td><div style="display:flex;align-items:center;gap:8px;min-width:118px"><span style="height:7px;width:74px;background:#e7eee7;border-radius:99px;overflow:hidden"><span style="display:block;height:100%;width:${p.progress}%;background:var(--teal);border-radius:99px"></span></span>${p.progress}%</div></td>
+    <td>${p.endDate ? escapeHtml(new Date(p.endDate).toLocaleDateString()) : "—"}</td><td><a class="btn-small" href="/projects/${encodeURIComponent(p.projectId)}">View</a></td></tr>`).join("")
+    : `<tr><td colspan="6" class="empty-state">No projects match this search. Create the first project to start monitoring work.</td></tr>`;
+  const content = `<div class="page-head"><h1>Project Monitoring</h1><p>Plan community work, record progress, and keep project updates visible to the team.</p></div>
+    <div class="card"><div class="row-between" style="margin-bottom:16px;flex-wrap:wrap;gap:12px"><form class="search-row" method="GET" action="/projects"><input class="search-input" name="search" placeholder="Search projects or locations..." value="${escapeHtml(search || "")}"/><button class="btn-small primary">Search</button>${search ? `<a class="btn-small" href="/projects">Clear</a>` : ""}</form><a class="btn-primary" href="/projects/new">+ New Project</a></div>
+    <div class="table-wrap"><table class="table"><thead><tr><th>Project</th><th>Location</th><th>Status</th><th>Progress</th><th>Target date</th><th>Action</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+  return appShell(user, "projects", content, "Project Monitoring");
+}
+
+function projectNewPage(user, errorMessage) {
+  const options = PROJECT_STATUSES.map((s) => `<option value="${s}">${s}</option>`).join("");
+  const content = `<div class="page-head"><h1>Create Project</h1><p>Set the initial scope and schedule for a community initiative.</p></div><div class="card" style="max-width:650px">${errorMessage ? `<div class="alert alert-error">${escapeHtml(errorMessage)}</div>` : ""}<form method="POST" action="/projects" class="stack"><div class="field"><label for="name">Project name</label><input id="name" name="name" required placeholder="e.g. Community Learning Centre"/></div><div class="field"><label for="description">Description</label><input id="description" name="description" placeholder="What will this project deliver?"/></div><div class="field"><label for="location">Location</label><input id="location" name="location" placeholder="District, region or community"/></div><div class="field"><label for="status">Initial status</label><select id="status" name="status">${options}</select></div><div class="field"><label for="progress">Initial progress (%)</label><input type="number" id="progress" name="progress" min="0" max="100" value="0" required/></div><div class="search-row"><div class="field" style="flex:1"><label for="startDate">Start date</label><input type="date" id="startDate" name="startDate"/></div><div class="field" style="flex:1"><label for="endDate">Target completion date</label><input type="date" id="endDate" name="endDate"/></div></div><button class="btn-primary" style="align-self:flex-start">Create Project</button></form></div>`;
+  return appShell(user, "projects", content, "Create Project");
+}
+
+function projectDetailPage(user, project, updates) {
+  const options = PROJECT_STATUSES.map((s) => `<option value="${s}" ${s === project.status ? "selected" : ""}>${s}</option>`).join("");
+  const timeline = updates.length ? updates.map((u) => `<div style="border-left:2px solid var(--teal);padding:0 0 20px 18px;margin-left:6px"><div style="font-size:12px;color:var(--muted);margin-bottom:5px">${escapeHtml(new Date(u.createdAt).toLocaleDateString())} · ${escapeHtml(u.recordedBy)}</div><strong>${escapeHtml(u.status)} · ${u.progress}%</strong><p style="margin:6px 0 0;color:var(--muted);font-size:13px">${escapeHtml(u.note)}</p></div>`).join("") : `<div class="empty-state">No progress updates recorded yet.</div>`;
+  const content = `<div class="page-head"><h1>${escapeHtml(project.name)}</h1><p><a class="link" href="/projects">← Back to all projects</a></p></div><div class="card"><dl><dt>Status</dt><dd><span class="badge ${projectStatusClass(project.status)}">${escapeHtml(project.status)}</span></dd><dt>Progress</dt><dd>${project.progress}%</dd><dt>Location</dt><dd>${escapeHtml(project.location || "—")}</dd><dt>Schedule</dt><dd>${project.startDate ? escapeHtml(new Date(project.startDate).toLocaleDateString()) : "TBD"} — ${project.endDate ? escapeHtml(new Date(project.endDate).toLocaleDateString()) : "TBD"}</dd><dt>Project owner</dt><dd>${escapeHtml(project.createdByName)}</dd><dt>Description</dt><dd>${escapeHtml(project.description || "—")}</dd></dl></div><div class="card"><h3>Project Updates</h3><p class="card-sub">A chronological record of project delivery and decisions.</p>${timeline}</div><div class="card"><h3>Record Progress Update</h3><p class="card-sub">This updates the project’s current status and progress.</p><form method="POST" action="/projects/${encodeURIComponent(project.projectId)}/updates" class="stack"><div class="field"><label for="note">Update note</label><input id="note" name="note" required placeholder="What changed, happened, or needs attention?"/></div><div class="search-row"><div class="field" style="flex:1"><label for="progress">Progress (%)</label><input type="number" id="progress" name="progress" min="0" max="100" value="${project.progress}" required/></div><div class="field" style="flex:1"><label for="status">Status</label><select id="status" name="status">${options}</select></div></div><button class="btn-primary" style="align-self:flex-start">Save Update</button></form></div>`;
+  return appShell(user, "projects", content, project.name);
+}
+
 /* ============================================================
    4. MIDDLEWARE
    ============================================================ */
@@ -1651,6 +1733,52 @@ app.post("/hours/:id/approve", requireAuth, requireRole("Project Manager", "Supe
 app.post("/hours/:id/reject", requireAuth, requireRole("Project Manager", "Super Admin"), asyncRoute(async (req, res) => {
   await setHourStatus(req.params.id, "Rejected", req.currentUser.email);
   res.redirect("/volunteers");
+}));
+
+/* ---------- Project Monitoring (role: Project Manager, Super Admin) ---------- */
+
+const PROJECT_ROLES = ["Project Manager", "Super Admin"];
+
+app.get("/projects", requireAuth, requireRole(...PROJECT_ROLES), asyncRoute(async (req, res) => {
+  const search = req.query.search ? String(req.query.search) : "";
+  res.type("html").send(projectListPage(req.currentUser, await listProjects(search), search));
+}));
+
+app.get("/projects/new", requireAuth, requireRole(...PROJECT_ROLES), (req, res) => {
+  res.type("html").send(projectNewPage(req.currentUser, null));
+});
+
+app.post("/projects", requireAuth, requireRole(...PROJECT_ROLES), asyncRoute(async (req, res) => {
+  const name = String(req.body.name || "").trim();
+  const description = String(req.body.description || "").trim();
+  const location = String(req.body.location || "").trim();
+  const status = String(req.body.status || "Planned");
+  const progress = Number(req.body.progress);
+  const startDate = String(req.body.startDate || "");
+  const endDate = String(req.body.endDate || "");
+  if (!name || !PROJECT_STATUSES.includes(status) || !Number.isInteger(progress) || progress < 0 || progress > 100 || (startDate && endDate && endDate < startDate)) {
+    return res.status(400).type("html").send(projectNewPage(req.currentUser, "Enter a project name, a valid status, progress between 0 and 100, and valid dates."));
+  }
+  const project = await createProject({ name, description, location, status, progress, startDate, endDate, createdBy: req.currentUser.id });
+  res.redirect(`/projects/${project.projectId}`);
+}));
+
+app.get("/projects/:id", requireAuth, requireRole(...PROJECT_ROLES), asyncRoute(async (req, res) => {
+  const project = await findProjectById(req.params.id);
+  if (!project) return res.status(404).type("html").send(errorPage("Not found", "This project doesn't exist.", req.currentUser));
+  res.type("html").send(projectDetailPage(req.currentUser, project, await listProjectUpdates(project.projectId)));
+}));
+
+app.post("/projects/:id/updates", requireAuth, requireRole(...PROJECT_ROLES), asyncRoute(async (req, res) => {
+  const project = await findProjectById(req.params.id);
+  if (!project) return res.status(404).type("html").send(errorPage("Not found", "This project doesn't exist.", req.currentUser));
+  const note = String(req.body.note || "").trim();
+  const progress = Number(req.body.progress);
+  const status = String(req.body.status || "");
+  if (note && Number.isInteger(progress) && progress >= 0 && progress <= 100 && PROJECT_STATUSES.includes(status)) {
+    await addProjectUpdate(project.projectId, { note, progress, status, recordedBy: req.currentUser.email });
+  }
+  res.redirect(`/projects/${project.projectId}`);
 }));
 
 /* ---------- Beneficiary Management (role: Project Manager, Super Admin) ---------- */

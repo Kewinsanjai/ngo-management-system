@@ -56,3 +56,32 @@ CREATE TABLE IF NOT EXISTS beneficiary_aid_log (
 
 CREATE INDEX IF NOT EXISTS idx_volunteer_hours_volunteer ON volunteer_hours(volunteer_id);
 CREATE INDEX IF NOT EXISTS idx_beneficiary_aid_log_beneficiary ON beneficiary_aid_log(beneficiary_id);
+
+-- Project Monitoring: project-level planning and an auditable progress timeline.
+CREATE TABLE IF NOT EXISTS projects (
+  project_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  location TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'Planned' CHECK (status IN ('Planned','Active','On Hold','Completed')),
+  progress INTEGER NOT NULL DEFAULT 0 CHECK (progress >= 0 AND progress <= 100),
+  start_date DATE,
+  end_date DATE,
+  created_by UUID NOT NULL REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CHECK (end_date IS NULL OR start_date IS NULL OR end_date >= start_date)
+);
+
+CREATE TABLE IF NOT EXISTS project_updates (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  project_id UUID NOT NULL REFERENCES projects(project_id) ON DELETE CASCADE,
+  note TEXT NOT NULL,
+  progress INTEGER NOT NULL CHECK (progress >= 0 AND progress <= 100),
+  status TEXT NOT NULL CHECK (status IN ('Planned','Active','On Hold','Completed')),
+  recorded_by TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_projects_status ON projects(status);
+CREATE INDEX IF NOT EXISTS idx_project_updates_project ON project_updates(project_id, created_at DESC);
