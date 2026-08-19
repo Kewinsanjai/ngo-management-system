@@ -1,124 +1,136 @@
-# ABC Foundation — NGO Management System
+# NGO Management System — Auth + Volunteer + Beneficiary + Project + Donation Management
 
-A server-rendered NGO management platform for coordinating volunteers, protecting beneficiary records, and monitoring community projects.
+Application code lives in one file, **`app.js`**. Storage is **PostgreSQL**
+— `db.js` handles the connection and `schema.sql` defines every table.
 
-## Current status
+## One-time setup
 
-**The application is functional and currently supports four modules:**
+1. Install PostgreSQL if you don't have it:
+   ```bash
+   # macOS
+   brew install postgresql@16
+   brew services start postgresql@16
+   ```
 
-| Module | Status | What is available |
-|---|---|---|
-| Authentication & role access | Complete | Registration, login, logout, sessions, and role-protected routes |
-| Volunteer Management | Complete | Skills, verification, working-hour logging, and manager approval workflows |
-| Beneficiary Management | Complete | Secure records, duplicate prevention, searchable records, and aid history |
-| Project Monitoring | Complete | Project creation, status/progress tracking, schedules, search, and update timelines |
-| Donation Processing | Planned | Not implemented — no payment handling or donation data is available |
-| Fundraising Campaigns | Planned | Not implemented |
-| Financial Transparency Dashboard | Planned | Not implemented |
+2. Create the database and a dedicated app user:
+   ```bash
+   psql postgres -c "CREATE USER ngo_app WITH PASSWORD 'ngo_dev_password';"
+   psql postgres -c "CREATE DATABASE ngo_management OWNER ngo_app;"
+   ```
 
-The public landing page is informational only. It does not expose beneficiary information or represent unbuilt modules as operational.
+3. Copy the env file and adjust if your setup differs:
+   ```bash
+   cp .env.example .env
+   ```
 
-## Technology
-
-- Node.js and Express
-- PostgreSQL (`pg`)
-- `express-session` for authenticated sessions
-- `bcryptjs` for password hashing
-- Server-rendered HTML, CSS, and vanilla JavaScript
-
-The implementation intentionally has no frontend framework or build process. Application logic and page templates are in `app.js`; PostgreSQL access is isolated in `db.js`.
-
-## Roles and access
-
-| Role | Access |
-|---|---|
-| Super Admin | Full access to projects, volunteers, and beneficiaries |
-| Project Manager | Full access to projects, volunteers, and beneficiaries |
-| Volunteer | Own profile, skills, and working hours only |
-| Donor | Account access only; the donation module is not yet available |
-| Public Visitor | Public landing page only |
-
-### Privacy
-
-Beneficiary information is confidential. It is available only to Super Admin and Project Manager users. It is never shown on the public site and is not accessible to Volunteers, Donors, or Public Visitors.
-
-## Setup
-
-### 1. Create the PostgreSQL database
-
-```bash
-# macOS example
-brew install postgresql@16
-brew services start postgresql@16
-
-psql postgres -c "CREATE USER ngo_app WITH PASSWORD 'ngo_dev_password';"
-psql postgres -c "CREATE DATABASE ngo_management OWNER ngo_app;"
-```
-
-### 2. Configure the connection
-
-```bash
-cp .env.example .env
-```
-
-Set `DATABASE_URL` in `.env` if your PostgreSQL settings differ. The development default is:
-
-```text
-postgresql://ngo_app:ngo_dev_password@localhost:5432/ngo_management
-```
-
-### 3. Install and run
+## Run it
 
 ```bash
 npm install
-npm start
+node app.js
 ```
 
-Open [http://localhost:3000](http://localhost:3000). The schema is applied automatically at server start; all tables and indexes use safe `IF NOT EXISTS` definitions.
+On startup, `app.js` calls `ensureSchema()`, which runs `schema.sql` —
+every table is created automatically if it doesn't already exist. No manual
+migration step. Then open **http://localhost:3000/login** (or `/register`).
 
-## Current routes
+## What's inside `app.js`
 
-| Route | Access | Purpose |
-|---|---|---|
-| `/` | Public | ABC Foundation landing page |
-| `/login`, `/register` | Public | Account access |
-| `/dashboard` | Signed-in users | Role-aware dashboard |
-| `/volunteer/profile` | Volunteer | Skills and personal working hours |
-| `/volunteers` | Super Admin, Project Manager | Volunteer search, verification, and hour approvals |
-| `/beneficiaries` | Super Admin, Project Manager | Secure beneficiary records |
-| `/projects` | Super Admin, Project Manager | Project Monitoring dashboard |
-| `/projects/new` | Super Admin, Project Manager | Create a project |
-| `/projects/:id` | Super Admin, Project Manager | Project overview and progress-update timeline |
+| Section | What it does |
+|---|---|
+| DATABASE | Every SQL query the app runs, grouped by entity (Users, Volunteers, Volunteer Hours, Beneficiaries, Aid Log, Projects, Project Updates, Donations, Donation Status History). All async — built on `db.js`'s connection pool. |
+| SHARED CSS | One stylesheet, reused by every page. |
+| PAGE TEMPLATES | Functions returning full HTML strings for every page. |
+| MIDDLEWARE | `requireAuth`, `requireRole(...)`, and `asyncRoute()` (forwards rejected promises to Express's error handler instead of crashing). |
+| APP / ROUTES | Auth → Volunteer Management → Project Monitoring → Beneficiary Management → Donation Processing → error handler → server start. |
 
-## Project Monitoring
+## Modules
 
-Authorized staff can create projects with a name, description, location, dates, status, and initial progress; search projects; and record percentage progress with a dated update note. Updates form an auditable timeline showing the author, date, status, progress, and note.
+**Auth** — register, login, sessions, protected dashboard, logout.
 
-There are no fabricated project statistics or public project records.
+**Volunteer Management (FR2)** — self-service skills + hour logging at
+`/volunteer/profile`; admin search/verify/approve at `/volunteers`
+(Project Manager, Super Admin only).
 
-## Database tables
+**Beneficiary Management (FR4)**:
+- `/beneficiaries` — searchable list (Project Manager, Super Admin only —
+  per SRS Section 8, this data is never public)
+- `/beneficiaries/new` — create a profile (full name, government ID / unique
+  hash, location, support summary)
+- `/beneficiaries/:id` — profile detail + full aid history + a form to log
+  new aid delivered
+- **Deduplication** is enforced twice: the app checks for an existing
+  `unique_gov_hash` before inserting (friendly error message), and the
+  database itself has a `UNIQUE` constraint on that column as a backstop.
 
-```text
-users
-volunteers
-volunteer_hours
-beneficiaries
-beneficiary_aid_log
-projects
-project_updates
+**Project Monitoring** — `/projects` list + search, `/projects/new` to create
+a project, `/projects/:id` for detail plus an append-only progress-update
+timeline (Project Manager, Super Admin only).
+
+**Donation Processing** — new this round. **Manual / Offline Record keeping
+only — no payment gateway is integrated.** Every donation is entered by
+staff after the money has already changed hands elsewhere (cash, bank
+transfer, cheque, mobile money, etc.); nothing on this platform charges a
+card or moves money.
+- `/donations` — dashboard + searchable, filterable list (Project Manager,
+  Super Admin only). Shows real, database-driven totals: amount received
+  (grouped by currency, never fabricated into a misleading single figure),
+  pending count, distinct donor count, and recent donations. Filters by
+  donor (name/email), status, payment method, purpose, and date range.
+- `/donations/new` — record a donation, with server-side validation
+  (positive amount, valid currency/payment-method/status allowlists, valid
+  email and date).
+- `/donations/:id` — full detail + a status-update form (Pending → Received
+  → Refunded/Cancelled) that requires an in-page confirmation step before
+  submitting, plus a complete audit trail of every status change
+  (`donation_status_history`: old status, new status, who changed it, when,
+  and an optional note).
+- `/my-donations` and `/my-donations/:id` — a signed-in **Donor** sees only
+  their own donations (matched by email, and linked to their account by
+  `donor_user_id` when a matching Donor account exists), rendered as a
+  simple receipt. Donors cannot see any other donor's records, and public
+  visitors have no route into this data at all.
+- The public landing page does **not** have a "Donate Now" payment button,
+  because there is no payment gateway to back it yet — adding one would be
+  misleading. The old "Donation Processing — Coming Soon" tile has been
+  removed now that the module is real.
+
+## Database schema
+
+```
+users                      id, name, email, password_hash, role, created_at
+volunteers                 volunteer_id (FK→users), skills, verified_status, updated_at
+volunteer_hours            id, volunteer_id (FK→users), task_name, hours_logged,
+                            date_logged, status, approved_by, approved_at
+beneficiaries               beneficiary_id, full_name, unique_gov_hash (UNIQUE),
+                            location, support_received, created_by (FK→users), created_at
+beneficiary_aid_log        id, beneficiary_id (FK→beneficiaries), description,
+                            aid_type, date_provided, recorded_by
+projects                   project_id, name, description, location, status, progress,
+                            start_date, end_date, created_by (FK→users), created_at, updated_at
+project_updates            id, project_id (FK→projects), note, progress, status,
+                            recorded_by, created_at
+donations                  donation_id, donor_name, donor_email, donor_user_id (FK→users),
+                            amount, currency, donation_date, payment_method, status,
+                            purpose, reference_number, internal_notes, recorded_by,
+                            created_at, updated_at
+donation_status_history    id, donation_id (FK→donations), old_status, new_status,
+                            changed_by, note, changed_at
 ```
 
-The complete definitions, validation constraints, foreign keys, and indexes are in `schema.sql`.
+Full definitions, constraints, and indexes are in `schema.sql`. All
+Donation Processing tables were added additively — no existing table was
+altered or dropped.
 
-## Project structure
+## Migrating from the CSV version
 
-```text
-app.js       Express application, SQL query helpers, templates, styles, and routes
-db.js        PostgreSQL pool and automatic schema setup
-schema.sql   Database schema
-data/        Legacy CSV samples; not used by the live PostgreSQL application
-```
+If you were on the earlier CSV-backed build: `data/*.csv` is no longer read
+or written by `app.js`. Nothing auto-imports old CSV rows into Postgres —
+if you need that data, write a one-off script that reads the CSVs and calls
+the equivalent `INSERT` statements, or re-register the test accounts.
 
-## Next planned module
+## Next modules (per the SRS)
 
-**Donation Processing** is the next planned feature. It should be implemented as a real, role-protected module with database-backed records before it appears as functional anywhere in the public or private interface.
+Fundraising Campaigns → Financial Transparency Dashboard. Same pattern each
+time: add tables to `schema.sql`, query functions to the DATABASE section,
+page templates, then routes.

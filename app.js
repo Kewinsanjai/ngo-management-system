@@ -252,6 +252,113 @@ async function addProjectUpdate(projectId, { note, progress, status, recordedBy 
   await query(`UPDATE projects SET progress = $2, status = $3, updated_at = now() WHERE project_id = $1`, [projectId, progress, status]);
 }
 
+// ---- Donations (Donation Processing) ----
+// Manual / Offline Record keeping — every insert starts life as 'Pending' and
+// every status change (including the very first insert) is written to
+// donation_status_history so /donations/:id can show a full audit trail.
+async function createDonation({ donorName, donorEmail, donorUserId, amount, currency, donationDate, paymentMethod, purpose, referenceNumber, internalNotes, recordedBy }) {
+  const res = await query(
+    `INSERT INTO donations (donor_name, donor_email, donor_user_id, amount, currency, donation_date, payment_method, purpose, reference_number, internal_notes, recorded_by)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+     RETURNING donation_id AS "donationId"`,
+    [donorName, donorEmail.toLowerCase(), donorUserId || null, amount, currency, donationDate, paymentMethod, purpose, referenceNumber || "", internalNotes || "", recordedBy]
+  );
+  const donationId = res.rows[0].donationId;
+  await query(
+    `INSERT INTO donation_status_history (donation_id, old_status, new_status, changed_by, note)
+     VALUES ($1, NULL, 'Pending', $2, 'Donation recorded')`,
+    [donationId, recordedBy]
+  );
+  return res.rows[0];
+}
+
+async function findDonationById(id) {
+  const res = await query(
+    `SELECT donation_id AS "donationId", donor_name AS "donorName", donor_email AS "donorEmail", donor_user_id AS "donorUserId",
+            amount, currency, donation_date AS "donationDate", payment_method AS "paymentMethod", status,
+            purpose, reference_number AS "referenceNumber", internal_notes AS "internalNotes",
+            recorded_by AS "recordedBy", created_at AS "createdAt", updated_at AS "updatedAt"
+     FROM donations WHERE donation_id = $1`,
+    [id]
+  );
+  return res.rows[0] || null;
+}
+
+async function listDonations({ donor, status, paymentMethod, purpose, dateFrom, dateTo } = {}) {
+  const res = await query(
+    `SELECT donation_id AS "donationId", donor_name AS "donorName", donor_email AS "donorEmail",
+            amount, currency, donation_date AS "donationDate", payment_method AS "paymentMethod", status,
+            purpose, reference_number AS "referenceNumber", created_at AS "createdAt"
+     FROM donations
+     WHERE ($1 = '' OR donor_name ILIKE '%' || $1 || '%' OR donor_email ILIKE '%' || $1 || '%')
+       AND ($2 = '' OR status = $2)
+       AND ($3 = '' OR payment_method = $3)
+       AND ($4 = '' OR purpose ILIKE '%' || $4 || '%')
+       AND ($5 = '' OR donation_date >= $5::date)
+       AND ($6 = '' OR donation_date <= $6::date)
+     ORDER BY donation_date DESC, created_at DESC`,
+    [donor || "", status || "", paymentMethod || "", purpose || "", dateFrom || "", dateTo || ""]
+  );
+  return res.rows;
+}
+
+async function listDonationsByEmail(email) {
+  const res = await query(
+    `SELECT donation_id AS "donationId", donor_name AS "donorName", donor_email AS "donorEmail",
+            amount, currency, donation_date AS "donationDate", payment_method AS "paymentMethod", status,
+            purpose, reference_number AS "referenceNumber", created_at AS "createdAt"
+     FROM donations WHERE lower(donor_email) = lower($1)
+     ORDER BY donation_date DESC, created_at DESC`,
+    [email]
+  );
+  return res.rows;
+}
+
+async function updateDonationStatus(id, newStatus, changedBy, note) {
+  const current = await findDonationById(id);
+  if (!current) return null;
+  await query(`UPDATE donations SET status = $2, updated_at = now() WHERE donation_id = $1`, [id, newStatus]);
+  await query(
+    `INSERT INTO donation_status_history (donation_id, old_status, new_status, changed_by, note)
+     VALUES ($1,$2,$3,$4,$5)`,
+    [id, current.status, newStatus, changedBy, note || ""]
+  );
+  return true;
+}
+
+async function listDonationStatusHistory(id) {
+  const res = await query(
+    `SELECT id, old_status AS "oldStatus", new_status AS "newStatus", changed_by AS "changedBy", note, changed_at AS "changedAt"
+     FROM donation_status_history WHERE donation_id = $1 ORDER BY changed_at DESC`,
+    [id]
+  );
+  return res.rows;
+}
+
+async function getDonationStats() {
+  const totals = await query(
+    `SELECT currency, COALESCE(SUM(amount), 0) AS "total"
+     FROM donations WHERE status = 'Received' GROUP BY currency ORDER BY currency`
+  );
+  const pending = await query(`SELECT COUNT(*) AS "count" FROM donations WHERE status = 'Pending'`);
+  const donors = await query(`SELECT COUNT(DISTINCT lower(donor_email)) AS "count" FROM donations`);
+  return {
+    totalsByCurrency: totals.rows.map((r) => ({ currency: r.currency, total: Number(r.total) })),
+    pendingCount: Number(pending.rows[0].count),
+    donorCount: Number(donors.rows[0].count),
+  };
+}
+
+async function listRecentDonations(limit) {
+  const res = await query(
+    `SELECT donation_id AS "donationId", donor_name AS "donorName", amount, currency, status,
+            donation_date AS "donationDate", purpose
+     FROM donations ORDER BY created_at DESC LIMIT $1`,
+    [limit]
+  );
+  return res.rows;
+}
+
 // ---- Dashboard summary (Super Admin / Project Manager) ----
 // Read-only aggregates over existing tables — no schema changes, no new routes.
 async function getVolunteerStats() {
@@ -361,6 +468,7 @@ img{ max-width:100%; display:block; }
 .badge-pending{ background:var(--warn-bg); color:var(--warn-ink); }
 .badge-approved{ background:var(--success-bg); color:#036B57; }
 .badge-rejected{ background:var(--danger-bg); color:var(--danger); }
+.badge-refunded{ background:#EEF1F6; color:#4C5875; }
 
 .alert{ font-size: 13px; border-radius: 8px; padding: 11px 14px; line-height:1.5; margin-bottom:16px; }
 .alert-error{ background: var(--danger-bg); color: var(--danger); }
@@ -669,18 +777,17 @@ function landingPage() {
         <p class="section-eyebrow">More ways to create impact</p><h2>Coming soon</h2><p>Our platform is designed to grow with the work.</p>
       </div>
       <div class="coming-soon-grid">
-        <div class="coming-soon-card"><div class="dot"></div><span>Donation Processing</span><br/><span class="coming-soon-tag">Planned</span></div>
         <div class="coming-soon-card"><div class="dot"></div><span>Fundraising Campaigns</span><br/><span class="coming-soon-tag">Planned</span></div>
         <div class="coming-soon-card"><div class="dot"></div><span>Financial Transparency</span><br/><span class="coming-soon-tag">Planned</span></div>
       </div>
     </div>
   </section>
 
-  <section class="involved" id="get-involved"><div class="section"><div class="section-head"><p class="section-eyebrow">Get involved</p><h2>There is a place for everyone.</h2></div><div class="involved-grid"><article class="involved-card"><small>VOLUNTEER</small><h3>Give your time and skills.</h3><p>Bring your care and experience to work that matters.</p><a class="link" href="/register?role=Volunteer">Become a volunteer →</a></article><article class="involved-card"><small>SUPPORT</small><h3>Stand with communities.</h3><p>More ways to help will be available soon.</p><span class="coming-soon-tag">Coming soon</span></article><article class="involved-card"><small>PARTNER</small><h3>Work together for impact.</h3><p>Partnership opportunities are coming soon.</p><span class="coming-soon-tag">Coming soon</span></article></div></div></section>
+  <section class="involved" id="get-involved"><div class="section"><div class="section-head"><p class="section-eyebrow">Get involved</p><h2>There is a place for everyone.</h2></div><div class="involved-grid"><article class="involved-card"><small>VOLUNTEER</small><h3>Give your time and skills.</h3><p>Bring your care and experience to work that matters.</p><a class="link" href="/register?role=Volunteer">Become a volunteer →</a></article><article class="involved-card"><small>SUPPORT</small><h3>Stand with communities.</h3><p>Donation records are managed by our team — reach out to discuss giving.</p><span class="coming-soon-tag">Staff-managed</span></article><article class="involved-card"><small>PARTNER</small><h3>Work together for impact.</h3><p>Partnership opportunities are coming soon.</p><span class="coming-soon-tag">Coming soon</span></article></div></div></section>
   <section class="photo-cta"><div><h2>Change starts with people.</h2><p>Be part of something bigger than yourself.</p><a class="btn-primary" href="/register">Join ABC Foundation</a></div></section>
 
   <footer class="site-footer">
-    <div class="footer-grid"><div><a class="site-brand" href="/">${HEART_GLYPH}<span>ABC FOUNDATION</span></a><p>Empowering Communities. Creating Lasting Change.</p></div><div><h4>EXPLORE</h4><a href="/">Home</a><a href="#about">About</a><a href="#our-work">Our Work</a><a href="#get-involved">Get Involved</a></div><div><h4>PLATFORM</h4><a href="/login">Login</a><a href="/register">Register</a><a href="#">Projects — Coming Soon</a><a href="#">Donations — Coming Soon</a></div></div><div class="site-footer-inner"><p>© 2026 ABC Foundation</p></div>
+    <div class="footer-grid"><div><a class="site-brand" href="/">${HEART_GLYPH}<span>ABC FOUNDATION</span></a><p>Empowering Communities. Creating Lasting Change.</p></div><div><h4>EXPLORE</h4><a href="/">Home</a><a href="#about">About</a><a href="#our-work">Our Work</a><a href="#get-involved">Get Involved</a></div><div><h4>PLATFORM</h4><a href="/login">Login</a><a href="/register">Register</a><a href="#">Projects — Coming Soon</a><a href="/login">Donations (staff portal)</a></div></div><div class="site-footer-inner"><p>© 2026 ABC Foundation</p></div>
   </footer>
 <script>document.getElementById('menuBtn').addEventListener('click',function(){document.getElementById('mobileMenu').classList.toggle('open')})</script>
 </body>
@@ -1046,12 +1153,19 @@ function sidebarLinks(role) {
       { key: "hours", href: "/volunteer/profile#hours", label: "◷  My Hours" },
     ];
   }
+  if (role === "Donor") {
+    return [
+      { key: "dashboard", href: "/dashboard", label: "⌂  Dashboard" },
+      { key: "donations", href: "/my-donations", label: "♥  My Donations" },
+    ];
+  }
   // Project Manager, Super Admin
   return [
     { key: "dashboard", href: "/dashboard", label: "⌂  Dashboard" },
     { key: "projects", href: "/projects", label: "◫  Projects" },
     { key: "volunteers", href: "/volunteers", label: "♙  Volunteers" },
     { key: "beneficiaries", href: "/beneficiaries", label: "♡  Beneficiaries" },
+    { key: "donations", href: "/donations", label: "$  Donations" },
   ];
 }
 
@@ -1102,6 +1216,7 @@ ${LOGOUT_SCRIPT}
 /* ---------- Dashboard ---------- */
 function dashboardPage(user, data) {
   const isVolunteer = user.role === "Volunteer";
+  const isDonor = user.role === "Donor";
 
   let content;
   if (isVolunteer) {
@@ -1131,8 +1246,54 @@ function dashboardPage(user, data) {
           <a class="btn-primary" href="/volunteer/profile#hours">Log hours</a>
         </div>
       </div>`;
+  } else if (isDonor) {
+    const donations = data.myDonations || [];
+    const totalsByCurrency = {};
+    donations.forEach((d) => {
+      if (d.status === "Received") {
+        totalsByCurrency[d.currency] = (totalsByCurrency[d.currency] || 0) + Number(d.amount);
+      }
+    });
+    const totalsHtml = Object.keys(totalsByCurrency).length
+      ? Object.entries(totalsByCurrency).map(([c, t]) => `<div>${escapeHtml(formatMoney(t, c))}</div>`).join("")
+      : `<span class="hint-text">No received donations yet.</span>`;
+    const recentRows = donations.slice(0, 5).map((d) => `
+        <tr>
+          <td>${escapeHtml(new Date(d.donationDate).toLocaleDateString())}</td>
+          <td>${escapeHtml(formatMoney(d.amount, d.currency))}</td>
+          <td>${escapeHtml(d.purpose || "—")}</td>
+          <td><span class="badge ${donationStatusClass(d.status)}">${escapeHtml(d.status)}</span></td>
+        </tr>`).join("");
+
+    content = `
+      <div class="page-head">
+        <h1>Welcome, ${escapeHtml(user.name.split(" ")[0])}</h1>
+        <p>Here's a snapshot of your giving history.</p>
+      </div>
+      <div class="card">
+        <dl>
+          <dt>Total received</dt><dd>${totalsHtml}</dd>
+          <dt>Total donations</dt><dd>${donations.length}</dd>
+        </dl>
+      </div>
+      <div class="card">
+        <h3>Recent donations</h3>
+        <p class="card-sub">Manual / Offline Record — entered by ABC Foundation staff. No online payment is processed here.</p>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>Date</th><th>Amount</th><th>Purpose</th><th>Status</th></tr></thead>
+            <tbody>${recentRows || `<tr><td colspan="4" class="empty-state">No donations recorded yet.</td></tr>`}</tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Quick actions</h3>
+        <div class="quick-actions">
+          <a class="btn-primary" href="/my-donations">View all my donations</a>
+        </div>
+      </div>`;
   } else {
-    const { stats, beneficiaryCount, recentActivity, recentBeneficiaries } = data;
+    const { stats, beneficiaryCount, recentActivity, recentBeneficiaries, donationStats, recentDonations } = data;
 
     const activityRows = recentActivity.length
       ? recentActivity.map((r) => `
@@ -1154,6 +1315,21 @@ function dashboardPage(user, data) {
             <td>${escapeHtml(new Date(b.createdAt).toLocaleDateString())}</td>
           </tr>`).join("")
       : `<tr><td colspan="4" class="empty-state">No beneficiaries yet.</td></tr>`;
+
+    const donationRows = recentDonations && recentDonations.length
+      ? recentDonations.map((d) => `
+          <tr>
+            <td>${escapeHtml(d.donorName)}</td>
+            <td>${escapeHtml(formatMoney(d.amount, d.currency))}</td>
+            <td>${escapeHtml(d.purpose || "—")}</td>
+            <td><span class="badge ${donationStatusClass(d.status)}">${escapeHtml(d.status)}</span></td>
+            <td>${escapeHtml(new Date(d.donationDate).toLocaleDateString())}</td>
+          </tr>`).join("")
+      : `<tr><td colspan="5" class="empty-state">No donations recorded yet.</td></tr>`;
+
+    const donationTotalsHtml = donationStats && donationStats.totalsByCurrency.length
+      ? donationStats.totalsByCurrency.map((t) => `<div>${escapeHtml(formatMoney(t.total, t.currency))}</div>`).join("")
+      : `<span class="hint-text">None yet</span>`;
 
     content = `
       <div class="page-head">
@@ -1191,10 +1367,25 @@ function dashboardPage(user, data) {
       </div>
 
       <div class="card">
+        <div class="row-between" style="margin-bottom:4px;flex-wrap:wrap;gap:10px;">
+          <h3 style="margin:0">Donations ${donationTotalsHtml ? "" : ""}</h3>
+          <div style="font-size:13px;color:var(--muted);">${donationTotalsHtml}</div>
+        </div>
+        <p class="card-sub">Manual / Offline Record — ${donationStats ? donationStats.pendingCount : 0} pending, ${donationStats ? donationStats.donorCount : 0} donors on file. No payment gateway is connected.</p>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>Donor</th><th>Amount</th><th>Purpose</th><th>Status</th><th>Date</th></tr></thead>
+            <tbody>${donationRows}</tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
         <h3>Quick actions</h3>
         <div class="quick-actions">
           <a class="btn-primary" href="/volunteers">Manage Volunteers</a>
           <a class="btn-primary" href="/beneficiaries">Manage Beneficiaries</a>
+          <a class="btn-primary" href="/donations">Manage Donations</a>
         </div>
       </div>`;
   }
@@ -1554,6 +1745,278 @@ function projectDetailPage(user, project, updates) {
   return appShell(user, "projects", content, project.name);
 }
 
+/* ---------- Donation Processing ---------- */
+const DONATION_STATUSES = ["Pending", "Received", "Refunded", "Cancelled"];
+const PAYMENT_METHODS = ["Cash", "Bank Transfer", "Cheque", "Mobile Money", "Card (Manual Entry)", "Other"];
+const CURRENCIES = ["USD", "EUR", "GBP", "INR", "KES", "NGN", "ZAR", "CAD", "AUD"];
+
+function donationStatusClass(status) {
+  return status === "Received" ? "badge-verified" : status === "Cancelled" ? "badge-rejected" : status === "Refunded" ? "badge-refunded" : "badge-pending";
+}
+
+function formatMoney(amount, currency) {
+  const n = Number(amount) || 0;
+  const formatted = n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return `${currency || "USD"} ${formatted}`;
+}
+
+function donationListPage(user, donations, filters, stats) {
+  const rows = donations.length
+    ? donations.map((d) => `
+        <tr>
+          <td>${escapeHtml(d.donorName)}<br/><span class="hint-text" style="margin:0;">${escapeHtml(d.donorEmail)}</span></td>
+          <td>${escapeHtml(formatMoney(d.amount, d.currency))}</td>
+          <td>${escapeHtml(d.paymentMethod)}</td>
+          <td>${escapeHtml(d.purpose || "—")}</td>
+          <td><span class="badge ${donationStatusClass(d.status)}">${escapeHtml(d.status)}</span></td>
+          <td>${escapeHtml(new Date(d.donationDate).toLocaleDateString())}</td>
+          <td><a class="btn-small" href="/donations/${encodeURIComponent(d.donationId)}">View</a></td>
+        </tr>`).join("")
+    : `<tr><td colspan="7" class="empty-state">No donations match these filters.</td></tr>`;
+
+  const statusOptions = ["", ...DONATION_STATUSES]
+    .map((s) => `<option value="${s}" ${filters.status === s ? "selected" : ""}>${s || "All statuses"}</option>`).join("");
+  const methodOptions = ["", ...PAYMENT_METHODS]
+    .map((m) => `<option value="${m}" ${filters.paymentMethod === m ? "selected" : ""}>${m || "All payment methods"}</option>`).join("");
+
+  const totalsHtml = stats.totalsByCurrency.length
+    ? stats.totalsByCurrency.map((t) => `<div>${escapeHtml(formatMoney(t.total, t.currency))}</div>`).join("")
+    : `<span class="hint-text">No donations received yet.</span>`;
+
+  const content = `
+    <div class="page-head">
+      <h1>Donation Processing</h1>
+      <p>Manual / Offline Record keeping — no payment gateway is connected. Every entry below was recorded by staff.</p>
+    </div>
+
+    <div class="stat-grid">
+      <div class="stat-card"><div class="stat-label">Total Received</div><div class="stat-value" style="font-size:19px;line-height:1.5;">${totalsHtml}</div></div>
+      <div class="stat-card"><div class="stat-label">Pending Donations</div><div class="stat-value">${stats.pendingCount}</div></div>
+      <div class="stat-card"><div class="stat-label">Number of Donors</div><div class="stat-value">${stats.donorCount}</div></div>
+      <div class="stat-card"><div class="stat-label">Donations Shown</div><div class="stat-value">${donations.length}</div></div>
+    </div>
+
+    <div class="card">
+      <form class="stack" method="GET" action="/donations" style="margin-bottom:18px;">
+        <div class="search-row" style="flex-wrap:wrap;">
+          <input type="text" class="search-input" name="donor" placeholder="Donor name or email" value="${escapeHtml(filters.donor || "")}" aria-label="Search by donor name or email" />
+          <select class="search-input" name="status" style="width:170px;" aria-label="Filter by status">${statusOptions}</select>
+          <select class="search-input" name="paymentMethod" style="width:190px;" aria-label="Filter by payment method">${methodOptions}</select>
+          <input type="text" class="search-input" name="purpose" placeholder="Purpose" value="${escapeHtml(filters.purpose || "")}" style="width:160px;" aria-label="Filter by purpose" />
+          <input type="date" class="search-input" name="dateFrom" value="${escapeHtml(filters.dateFrom || "")}" style="width:150px;" aria-label="From date" />
+          <input type="date" class="search-input" name="dateTo" value="${escapeHtml(filters.dateTo || "")}" style="width:150px;" aria-label="To date" />
+          <button type="submit" class="btn-small primary">Filter</button>
+          <a class="btn-small" href="/donations">Clear</a>
+        </div>
+      </form>
+      <div class="row-between" style="margin-bottom:12px;flex-wrap:wrap;gap:10px;">
+        <span class="hint-text" style="margin:0;">${donations.length} donation${donations.length === 1 ? "" : "s"} found</span>
+        <a class="btn-primary" href="/donations/new">+ Record Donation</a>
+      </div>
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Donor</th><th>Amount</th><th>Method</th><th>Purpose</th><th>Status</th><th>Date</th><th>Action</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>`;
+
+  return appShell(user, "donations", content, "Donation Processing");
+}
+
+function donationNewPage(user, errorMessage, values) {
+  values = values || {};
+  const methodOptions = PAYMENT_METHODS
+    .map((m) => `<option value="${m}" ${values.paymentMethod === m ? "selected" : ""}>${m}</option>`).join("");
+  const currencyOptions = CURRENCIES
+    .map((c) => `<option value="${c}" ${(values.currency || "USD") === c ? "selected" : ""}>${c}</option>`).join("");
+
+  const content = `
+    <div class="page-head">
+      <h1>Record Donation</h1>
+      <p>Manual / Offline Record — enter details for a donation received outside the platform. No payment gateway is connected.</p>
+    </div>
+    <div class="card" style="max-width:640px;">
+      <div class="alert" style="background:var(--warn-bg);color:var(--warn-ink);">This form records a donation manually. It does not charge a card or process any payment.</div>
+      ${errorMessage ? `<div class="alert alert-error">${escapeHtml(errorMessage)}</div>` : ""}
+      <form method="POST" action="/donations" class="stack" novalidate>
+        <div class="field">
+          <label for="donorName">Donor Name</label>
+          <input type="text" id="donorName" name="donorName" required value="${escapeHtml(values.donorName || "")}" placeholder="Jane Doe" />
+        </div>
+        <div class="field">
+          <label for="donorEmail">Donor Email</label>
+          <input type="email" id="donorEmail" name="donorEmail" required value="${escapeHtml(values.donorEmail || "")}" placeholder="donor@example.org" />
+          <span class="hint-text">If this matches a registered Donor account, the donation will appear on their "My Donations" page.</span>
+        </div>
+        <div class="search-row">
+          <div class="field" style="flex:1">
+            <label for="amount">Amount</label>
+            <input type="number" id="amount" name="amount" required min="0.01" step="0.01" value="${escapeHtml(values.amount || "")}" placeholder="100.00" />
+          </div>
+          <div class="field" style="flex:1">
+            <label for="currency">Currency</label>
+            <select id="currency" name="currency">${currencyOptions}</select>
+          </div>
+        </div>
+        <div class="search-row">
+          <div class="field" style="flex:1">
+            <label for="donationDate">Donation Date</label>
+            <input type="date" id="donationDate" name="donationDate" required value="${escapeHtml(values.donationDate || "")}" />
+          </div>
+          <div class="field" style="flex:1">
+            <label for="paymentMethod">Payment Method</label>
+            <select id="paymentMethod" name="paymentMethod">${methodOptions}</select>
+            <span class="hint-text">Manual / Offline Record — select how the funds were actually received.</span>
+          </div>
+        </div>
+        <div class="field">
+          <label for="purpose">Purpose / Designation</label>
+          <input type="text" id="purpose" name="purpose" value="${escapeHtml(values.purpose || "")}" placeholder="General Fund, Education, Flood Relief..." />
+        </div>
+        <div class="field">
+          <label for="referenceNumber">Reference Number</label>
+          <input type="text" id="referenceNumber" name="referenceNumber" value="${escapeHtml(values.referenceNumber || "")}" placeholder="Bank transfer ID, receipt #, cheque #..." />
+        </div>
+        <div class="field">
+          <label for="internalNotes">Internal Notes</label>
+          <input type="text" id="internalNotes" name="internalNotes" value="${escapeHtml(values.internalNotes || "")}" placeholder="Visible to admins only" />
+        </div>
+        <button type="submit" class="btn-primary" style="align-self:flex-start;">Record Donation</button>
+      </form>
+    </div>`;
+
+  return appShell(user, "donations", content, "Record Donation");
+}
+
+function donationDetailPage(user, donation, history) {
+  const statusOptions = DONATION_STATUSES
+    .map((s) => `<option value="${s}" ${s === donation.status ? "selected" : ""}>${s}</option>`).join("");
+
+  const historyRows = history.length
+    ? history.map((h) => `
+        <tr>
+          <td>${escapeHtml(new Date(h.changedAt).toLocaleString())}</td>
+          <td>${h.oldStatus ? escapeHtml(h.oldStatus) + " → " : ""}<strong>${escapeHtml(h.newStatus)}</strong></td>
+          <td>${escapeHtml(h.changedBy)}</td>
+          <td>${escapeHtml(h.note || "—")}</td>
+        </tr>`).join("")
+    : `<tr><td colspan="4" class="empty-state">No history recorded.</td></tr>`;
+
+  const content = `
+    <div class="page-head">
+      <h1>Donation #${escapeHtml(donation.donationId.slice(0, 8))}</h1>
+      <p><a class="link" href="/donations">← Back to all donations</a></p>
+    </div>
+
+    <div class="card">
+      <div class="alert" style="background:var(--warn-bg);color:var(--warn-ink);">Manual / Offline Record — no payment gateway is connected. This reflects a donation entered by staff.</div>
+      <dl>
+        <dt>Donor Name</dt><dd>${escapeHtml(donation.donorName)}</dd>
+        <dt>Donor Email</dt><dd>${escapeHtml(donation.donorEmail)}</dd>
+        <dt>Amount</dt><dd>${escapeHtml(formatMoney(donation.amount, donation.currency))}</dd>
+        <dt>Donation Date</dt><dd>${escapeHtml(new Date(donation.donationDate).toLocaleDateString())}</dd>
+        <dt>Payment Method</dt><dd>${escapeHtml(donation.paymentMethod)}</dd>
+        <dt>Status</dt><dd><span class="badge ${donationStatusClass(donation.status)}">${escapeHtml(donation.status)}</span></dd>
+        <dt>Purpose</dt><dd>${escapeHtml(donation.purpose || "—")}</dd>
+        <dt>Reference Number</dt><dd>${escapeHtml(donation.referenceNumber || "—")}</dd>
+        <dt>Internal Notes</dt><dd>${escapeHtml(donation.internalNotes || "—")}</dd>
+        <dt>Recorded By</dt><dd>${escapeHtml(donation.recordedBy)}</dd>
+        <dt>Created</dt><dd>${escapeHtml(new Date(donation.createdAt).toLocaleString())}</dd>
+      </dl>
+    </div>
+
+    <div class="card">
+      <h3>Update Status</h3>
+      <p class="card-sub">Every change is logged to the audit history below. You'll be asked to confirm before it's saved.</p>
+      <form method="POST" action="/donations/${encodeURIComponent(donation.donationId)}/status" class="stack" id="statusForm">
+        <div class="search-row">
+          <div class="field" style="flex:1">
+            <label for="status">New Status</label>
+            <select id="status" name="status">${statusOptions}</select>
+          </div>
+          <div class="field" style="flex:2">
+            <label for="note">Note (optional)</label>
+            <input type="text" id="note" name="note" placeholder="Reason for this change" />
+          </div>
+        </div>
+        <button type="submit" class="btn-primary" style="align-self:flex-start;">Update Status</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h3>Audit History</h3>
+      <p class="card-sub">Full donation history — every status transition, who made it, and when.</p>
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>When</th><th>Change</th><th>Changed By</th><th>Note</th></tr></thead>
+          <tbody>${historyRows}</tbody>
+        </table>
+      </div>
+    </div>
+    <script>
+      document.getElementById('statusForm').addEventListener('submit', function (e) {
+        var sel = document.getElementById('status');
+        var chosen = sel.options[sel.selectedIndex].text;
+        if (!window.confirm('Change this donation\\'s status to "' + chosen + '"? This will be recorded in the audit history.')) {
+          e.preventDefault();
+        }
+      });
+    </script>`;
+
+  return appShell(user, "donations", content, "Donation Detail");
+}
+
+function myDonationsPage(user, donations) {
+  const rows = donations.length
+    ? donations.map((d) => `
+        <tr>
+          <td>${escapeHtml(new Date(d.donationDate).toLocaleDateString())}</td>
+          <td>${escapeHtml(formatMoney(d.amount, d.currency))}</td>
+          <td>${escapeHtml(d.purpose || "—")}</td>
+          <td><span class="badge ${donationStatusClass(d.status)}">${escapeHtml(d.status)}</span></td>
+          <td><a class="btn-small" href="/my-donations/${encodeURIComponent(d.donationId)}">View Receipt</a></td>
+        </tr>`).join("")
+    : `<tr><td colspan="5" class="empty-state">You don't have any donations on record yet.</td></tr>`;
+
+  const content = `
+    <div class="page-head">
+      <h1>My Donations</h1>
+      <p>Your donation history as recorded by ABC Foundation staff. Manual / Offline Record — no online payment is processed here.</p>
+    </div>
+    <div class="card">
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Date</th><th>Amount</th><th>Purpose</th><th>Status</th><th>Action</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>`;
+
+  return appShell(user, "donations", content, "My Donations");
+}
+
+function donationReceiptPage(user, donation) {
+  const content = `
+    <div class="page-head">
+      <h1>Donation Receipt</h1>
+      <p><a class="link" href="/my-donations">← Back to my donations</a></p>
+    </div>
+    <div class="card" style="max-width:520px;">
+      <div class="alert" style="background:var(--warn-bg);color:var(--warn-ink);">Manual / Offline Record — this reflects a donation recorded by staff, not an automated payment confirmation.</div>
+      <dl>
+        <dt>Amount</dt><dd>${escapeHtml(formatMoney(donation.amount, donation.currency))}</dd>
+        <dt>Date</dt><dd>${escapeHtml(new Date(donation.donationDate).toLocaleDateString())}</dd>
+        <dt>Payment Method</dt><dd>${escapeHtml(donation.paymentMethod)}</dd>
+        <dt>Status</dt><dd><span class="badge ${donationStatusClass(donation.status)}">${escapeHtml(donation.status)}</span></dd>
+        <dt>Purpose</dt><dd>${escapeHtml(donation.purpose || "—")}</dd>
+        <dt>Reference Number</dt><dd>${escapeHtml(donation.referenceNumber || "—")}</dd>
+      </dl>
+    </div>`;
+
+  return appShell(user, "donations", content, "Donation Receipt");
+}
+
 /* ============================================================
    4. MIDDLEWARE
    ============================================================ */
@@ -1617,13 +2080,20 @@ app.get("/dashboard", requireAuth, asyncRoute(async (req, res) => {
     res.type("html").send(dashboardPage(user, { volunteerRecord, hourCount: hourLogs.length }));
     return;
   }
-  const [stats, beneficiaryCount, recentActivity, recentBeneficiaries] = await Promise.all([
+  if (user.role === "Donor") {
+    const myDonations = await listDonationsByEmail(user.email);
+    res.type("html").send(dashboardPage(user, { myDonations }));
+    return;
+  }
+  const [stats, beneficiaryCount, recentActivity, recentBeneficiaries, donationStats, recentDonations] = await Promise.all([
     getVolunteerStats(),
     countBeneficiaries(),
     listRecentVolunteerActivity(5),
     listRecentBeneficiaries(5),
+    getDonationStats(),
+    listRecentDonations(5),
   ]);
-  res.type("html").send(dashboardPage(user, { stats, beneficiaryCount, recentActivity, recentBeneficiaries }));
+  res.type("html").send(dashboardPage(user, { stats, beneficiaryCount, recentActivity, recentBeneficiaries, donationStats, recentDonations }));
 }));
 
 /* ---------- Auth: API ---------- */
@@ -1843,6 +2313,111 @@ app.post("/beneficiaries/:id/aid", requireAuth, requireRole(...BENEFICIARY_ROLES
     await logAid(req.params.id, description, aidType, req.currentUser.email);
   }
   res.redirect(`/beneficiaries/${req.params.id}`);
+}));
+
+/* ---------- Donation Processing (role: Project Manager, Super Admin) ---------- */
+/* Manual / Offline Record keeping — no payment gateway is integrated. Donors
+   can only ever see their own donations (see the /my-donations routes below);
+   public visitors never get a route into this data at all. */
+
+const DONATION_ADMIN_ROLES = ["Project Manager", "Super Admin"];
+
+app.get("/donations", requireAuth, requireRole(...DONATION_ADMIN_ROLES), asyncRoute(async (req, res) => {
+  const filters = {
+    donor: req.query.donor ? String(req.query.donor) : "",
+    status: DONATION_STATUSES.includes(req.query.status) ? String(req.query.status) : "",
+    paymentMethod: PAYMENT_METHODS.includes(req.query.paymentMethod) ? String(req.query.paymentMethod) : "",
+    purpose: req.query.purpose ? String(req.query.purpose) : "",
+    dateFrom: req.query.dateFrom ? String(req.query.dateFrom) : "",
+    dateTo: req.query.dateTo ? String(req.query.dateTo) : "",
+  };
+  const [donations, stats] = await Promise.all([listDonations(filters), getDonationStats()]);
+  res.type("html").send(donationListPage(req.currentUser, donations, filters, stats));
+}));
+
+app.get("/donations/new", requireAuth, requireRole(...DONATION_ADMIN_ROLES), (req, res) => {
+  res.type("html").send(donationNewPage(req.currentUser, null, {
+    currency: "USD",
+    donationDate: new Date().toISOString().slice(0, 10),
+  }));
+});
+
+app.post("/donations", requireAuth, requireRole(...DONATION_ADMIN_ROLES), asyncRoute(async (req, res) => {
+  const body = req.body || {};
+  const donorName = String(body.donorName || "").trim();
+  const donorEmail = String(body.donorEmail || "").trim();
+  const amount = Number(body.amount);
+  const currency = String(body.currency || "USD").trim().toUpperCase();
+  const donationDate = String(body.donationDate || "");
+  const paymentMethod = String(body.paymentMethod || "");
+  const purpose = String(body.purpose || "").trim() || "General Fund";
+  const referenceNumber = String(body.referenceNumber || "").trim();
+  const internalNotes = String(body.internalNotes || "").trim();
+
+  const values = { donorName, donorEmail, amount: body.amount, currency, donationDate, paymentMethod, purpose, referenceNumber, internalNotes };
+
+  if (!donorName) {
+    return res.status(400).type("html").send(donationNewPage(req.currentUser, "Enter the donor's name.", values));
+  }
+  if (!isValidEmail(donorEmail)) {
+    return res.status(400).type("html").send(donationNewPage(req.currentUser, "Enter a valid donor email address.", values));
+  }
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return res.status(400).type("html").send(donationNewPage(req.currentUser, "Enter a donation amount greater than zero.", values));
+  }
+  if (!CURRENCIES.includes(currency)) {
+    return res.status(400).type("html").send(donationNewPage(req.currentUser, "Select a valid currency.", values));
+  }
+  if (!donationDate || Number.isNaN(Date.parse(donationDate))) {
+    return res.status(400).type("html").send(donationNewPage(req.currentUser, "Enter a valid donation date.", values));
+  }
+  if (!PAYMENT_METHODS.includes(paymentMethod)) {
+    return res.status(400).type("html").send(donationNewPage(req.currentUser, "Select a valid payment method.", values));
+  }
+
+  // Link the donation to a registered Donor account by email, when one exists,
+  // so it shows up on that donor's "My Donations" page.
+  const donorUser = await findUserByEmail(donorEmail);
+  const donorUserId = donorUser && donorUser.role === "Donor" ? donorUser.id : null;
+
+  const created = await createDonation({
+    donorName, donorEmail, donorUserId, amount, currency, donationDate, paymentMethod,
+    purpose, referenceNumber, internalNotes, recordedBy: req.currentUser.email,
+  });
+  res.redirect(`/donations/${created.donationId}`);
+}));
+
+app.get("/donations/:id", requireAuth, requireRole(...DONATION_ADMIN_ROLES), asyncRoute(async (req, res) => {
+  const donation = await findDonationById(req.params.id);
+  if (!donation) return res.status(404).type("html").send(errorPage("Not found", "This donation record doesn't exist.", req.currentUser));
+  const history = await listDonationStatusHistory(req.params.id);
+  res.type("html").send(donationDetailPage(req.currentUser, donation, history));
+}));
+
+app.post("/donations/:id/status", requireAuth, requireRole(...DONATION_ADMIN_ROLES), asyncRoute(async (req, res) => {
+  const donation = await findDonationById(req.params.id);
+  if (!donation) return res.status(404).type("html").send(errorPage("Not found", "This donation record doesn't exist.", req.currentUser));
+  const newStatus = String(req.body.status || "");
+  const note = String(req.body.note || "").trim();
+  if (DONATION_STATUSES.includes(newStatus)) {
+    await updateDonationStatus(req.params.id, newStatus, req.currentUser.email, note);
+  }
+  res.redirect(`/donations/${req.params.id}`);
+}));
+
+/* ---------- Donor: "My Donations" (role: Donor only) ---------- */
+
+app.get("/my-donations", requireAuth, requireRole("Donor"), asyncRoute(async (req, res) => {
+  const donations = await listDonationsByEmail(req.currentUser.email);
+  res.type("html").send(myDonationsPage(req.currentUser, donations));
+}));
+
+app.get("/my-donations/:id", requireAuth, requireRole("Donor"), asyncRoute(async (req, res) => {
+  const donation = await findDonationById(req.params.id);
+  if (!donation || donation.donorEmail.toLowerCase() !== req.currentUser.email.toLowerCase()) {
+    return res.status(404).type("html").send(errorPage("Not found", "This donation record doesn't exist.", req.currentUser));
+  }
+  res.type("html").send(donationReceiptPage(req.currentUser, donation));
 }));
 
 /* ---------- Error handler (catches anything asyncRoute forwarded) ---------- */

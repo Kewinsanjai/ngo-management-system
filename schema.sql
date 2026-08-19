@@ -85,3 +85,43 @@ CREATE TABLE IF NOT EXISTS project_updates (
 
 CREATE INDEX IF NOT EXISTS idx_projects_status ON projects(status);
 CREATE INDEX IF NOT EXISTS idx_project_updates_project ON project_updates(project_id, created_at DESC);
+
+-- Donation Processing
+-- Manual / Offline Record keeping — no payment gateway is integrated yet.
+-- Every donation is entered by staff (Project Manager / Super Admin) and every
+-- status change is logged to donation_status_history for a full audit trail.
+CREATE TABLE IF NOT EXISTS donations (
+  donation_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  donor_name TEXT NOT NULL,
+  donor_email TEXT NOT NULL,
+  donor_user_id UUID REFERENCES users(id),
+  amount NUMERIC(12,2) NOT NULL CHECK (amount > 0),
+  currency TEXT NOT NULL DEFAULT 'USD',
+  donation_date DATE NOT NULL DEFAULT CURRENT_DATE,
+  payment_method TEXT NOT NULL CHECK (payment_method IN ('Cash','Bank Transfer','Cheque','Mobile Money','Card (Manual Entry)','Other')),
+  status TEXT NOT NULL DEFAULT 'Pending' CHECK (status IN ('Pending','Received','Refunded','Cancelled')),
+  purpose TEXT NOT NULL DEFAULT 'General Fund',
+  reference_number TEXT NOT NULL DEFAULT '',
+  internal_notes TEXT NOT NULL DEFAULT '',
+  recorded_by TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Full audit trail of every status transition (FR: "donation detail page with
+-- full donation history/audit information").
+CREATE TABLE IF NOT EXISTS donation_status_history (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  donation_id UUID NOT NULL REFERENCES donations(donation_id) ON DELETE CASCADE,
+  old_status TEXT,
+  new_status TEXT NOT NULL,
+  changed_by TEXT NOT NULL,
+  note TEXT NOT NULL DEFAULT '',
+  changed_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_donations_status ON donations(status);
+CREATE INDEX IF NOT EXISTS idx_donations_donor_email ON donations(lower(donor_email));
+CREATE INDEX IF NOT EXISTS idx_donations_donor_user ON donations(donor_user_id);
+CREATE INDEX IF NOT EXISTS idx_donations_date ON donations(donation_date DESC);
+CREATE INDEX IF NOT EXISTS idx_donation_status_history_donation ON donation_status_history(donation_id, changed_at DESC);

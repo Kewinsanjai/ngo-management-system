@@ -1,7 +1,7 @@
 {
   "name": "ngo-management-system",
   "version": "1.0.0",
-  "description": "NGO Management System — Auth, Volunteer Management, Beneficiary Management (PostgreSQL-backed)",
+  "description": "NGO Management System — Auth, Volunteer Management, Beneficiary Management, Project Monitoring, Donation Processing (PostgreSQL-backed)",
   "main": "app.js",
   "scripts": {
     "start": "node app.js"
