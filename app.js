@@ -481,7 +481,12 @@ img{ max-width:100%; display:block; }
 .skill-tag{ display:inline-block; background:var(--bg); color:var(--teal); padding:3px 10px; border-radius:6px;
   font-size:11.5px; font-weight:700; margin:2px 4px 2px 0; }
 .hint-text{ font-size:11.5px; color:var(--muted); margin-top:-6px; display:block; margin-bottom:6px; }
-.empty-state{ padding:28px; text-align:center; color:var(--muted); font-size:13px; }
+.empty-state{ padding:32px 16px; text-align:center; color:var(--muted); font-size:13px; }
+.empty-state svg{ width:30px; height:30px; color:var(--muted-2); margin:0 auto 10px; display:block; }
+.empty-state span{ display:block; }
+
+/* submit-loading state — applied by FORM_UX_SCRIPT to any submit button */
+.btn-primary.is-submitting, .btn-small.is-submitting{ opacity:0.65; pointer-events:none; cursor:progress; }
 
 /* ---------- form elements (auth pages + in-app forms) ---------- */
 form.stack{ display:flex; flex-direction:column; gap: 14px; }
@@ -641,8 +646,12 @@ body.app-body{ margin:0; }
 
 .content-area{ flex:1; padding:32px; max-width:1100px; width:100%; margin:0 auto; }
 .page-head{ margin-bottom:24px; }
-.page-head h1{ font-family:var(--font-head); font-size:25px; color:var(--navy); margin:0 0 6px 0; }
-.page-head p{ font-size:13.5px; color:var(--muted); margin:0; }
+.page-head h1{ font-family:var(--font-head); font-size:25px; color:var(--navy); margin:0; }
+.page-head p{ font-size:13.5px; color:var(--muted); margin:8px 0 0 0; }
+.page-head-row{ display:flex; align-items:center; gap:12px; }
+.page-head-icon{ width:42px; height:42px; border-radius:12px; background:var(--success-bg); display:flex;
+  align-items:center; justify-content:center; flex-shrink:0; }
+.page-head-icon svg{ width:21px; height:21px; color:var(--teal); }
 
 .card{ background:#fff; border:1px solid var(--border); border-radius:var(--radius); padding:22px 24px;
   box-shadow:var(--shadow-sm); }
@@ -680,6 +689,27 @@ body.app-body{ margin:0; }
   .topbar{ padding:12px 16px; }
   .user-meta{ display:none; }
 }
+
+/* ---------- responsive tables: stacked cards instead of horizontal scroll ---------- */
+@media (max-width: 700px){
+  .table-wrap{ overflow-x:visible; }
+  .table{ min-width:0; }
+  .table thead{ display:none; }
+  .table, .table tbody, .table tr{ display:block; width:100%; }
+  .table tr{ background:#fff; border:1px solid var(--border); border-radius:10px; margin-bottom:12px;
+    padding:4px 14px; box-shadow:var(--shadow-sm); }
+  .table tr:last-child{ margin-bottom:0; }
+  .table td{ display:flex; align-items:flex-start; justify-content:space-between; gap:14px;
+    padding:10px 0; border-bottom:1px solid #EEF4F3; text-align:right; }
+  .table td:last-child{ border-bottom:none; }
+  .table td::before{ content:attr(data-label); font-size:11px; font-weight:700; color:var(--muted);
+    text-transform:uppercase; letter-spacing:0.3px; text-align:left; margin-right:auto; flex-shrink:0;
+    padding-top:1px; }
+  .table td:not([data-label])::before{ content:none; }
+  .table td[colspan]{ display:block; text-align:center; padding:6px 0; }
+  .table td[colspan]::before{ content:none; }
+  .table .inline-form{ display:inline-block; margin-left:8px; }
+}
 `;
 
 const HEART_GLYPH = `<span class="glyph"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 21s-7.5-4.6-10-9.3C0.3 8.1 2 4.5 5.4 4c2-.3 3.7.6 4.9 2.1L12 8l1.7-1.9C15 4.6 16.7 3.7 18.6 4c3.4.5 5.1 4.1 3.4 7.7C19.5 16.4 12 21 12 21z" fill="#fff"/></svg></span>`;
@@ -688,6 +718,11 @@ const ICONS = {
   volunteers: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
   beneficiaries: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78Z"/></svg>`,
   auth: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>`,
+  dashboard: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 12 3l9 6.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1Z"/></svg>`,
+  profile: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-6 8-6s8 2 8 6"/></svg>`,
+  projects: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="17" rx="2"/><path d="M9 3v3h6V3M8 11h8M8 15h5"/></svg>`,
+  donations: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78Z"/><path d="M9 12h2.5l1 2 2-4 1 2H17"/></svg>`,
+  receipt: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2Z"/><path d="M9 8h6M9 12h6"/></svg>`,
 };
 
 function escapeHtml(str) {
@@ -702,11 +737,81 @@ function initials(name) {
   return (parts[0][0] + (parts[1] ? parts[1][0] : "")).toUpperCase();
 }
 
+/* ---------- Shared small page-building helpers ---------- */
+
+// Page-head with an icon badge, used by every authenticated page for a
+// consistent, more visual header instead of plain text.
+function pageHead(iconKey, title, subtitle) {
+  const icon = ICONS[iconKey] || ICONS.dashboard;
+  return `
+    <div class="page-head">
+      <div class="page-head-row">
+        <span class="page-head-icon">${icon}</span>
+        <h1>${escapeHtml(title)}</h1>
+      </div>
+      <p>${subtitle}</p>
+    </div>`;
+}
+
+// Success/error banner rendered from a flash message popped off the session
+// (see setFlash/popFlash). Renders nothing when there's no flash to show.
+function flashBanner(flash) {
+  if (!flash || !flash.message) return "";
+  const cls = flash.type === "error" ? "alert-error" : "alert-success";
+  return `<div class="alert ${cls}">${escapeHtml(flash.message)}</div>`;
+}
+
+// A consistent, icon-led empty state for any table. Returns a full <tr> so
+// callers can drop it straight into a tbody's ternary/ternary-less fallback.
+function emptyRow(colspan, message) {
+  return `<tr><td colspan="${colspan}"><div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M3 11h4.5a1 1 0 0 1 .9.55l.7 1.4a1 1 0 0 0 .9.55h3a1 1 0 0 0 .9-.55l.7-1.4a1 1 0 0 1 .9-.55H21"/><path d="M7 7V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2"/></svg><span>${escapeHtml(message)}</span></div></td></tr>`;
+}
+
 const LOGOUT_SCRIPT = `
 <script>
 document.getElementById('logoutBtn').addEventListener('click', function(){
   fetch('/api/logout', { method: 'POST' }).then(function(){ window.location.href = '/login'; });
 });
+</script>`;
+
+// Shared client-side UX layer for every authenticated page: lightweight
+// required-field validation styling (matching the login/register look) and
+// a "please wait" loading state on the submit button, without needing every
+// form converted to a JSON/AJAX flow. Safe to run on any page — it only acts
+// on forms that exist.
+const FORM_UX_SCRIPT = `
+<script>
+(function(){
+  document.querySelectorAll('.content-area form').forEach(function(form){
+    form.addEventListener('submit', function(e){
+      var valid = true;
+      form.querySelectorAll('[required]').forEach(function(input){
+        var field = input.closest('.field');
+        var ok = input.checkValidity();
+        if (field) field.classList.toggle('has-error', !ok);
+        if (!ok) valid = false;
+      });
+      if (!valid) {
+        e.preventDefault();
+        var firstInvalid = form.querySelector('.has-error input, .has-error select');
+        if (firstInvalid) firstInvalid.focus();
+        return;
+      }
+      var btn = form.querySelector('button[type="submit"]');
+      var method = (form.getAttribute('method') || 'GET').toUpperCase();
+      if (btn && method === 'POST' && !btn.disabled) {
+        btn.classList.add('is-submitting');
+        btn.disabled = true;
+      }
+    });
+    form.querySelectorAll('[required]').forEach(function(input){
+      input.addEventListener('input', function(){
+        var field = input.closest('.field');
+        if (field && input.checkValidity()) field.classList.remove('has-error');
+      });
+    });
+  });
+})();
 </script>`;
 
 /* ============================================================
@@ -764,7 +869,7 @@ function landingPage() {
     <div class="section-head">
       <p class="section-eyebrow">Our work</p><h2>Where compassion becomes action.</h2><p>A glimpse of the community-focused work that inspires us.</p>
     </div>
-    <div class="work-grid"><article class="work-card"><img alt="Community support" src="https://images.unsplash.com/photo-1497486751825-1233686d5d80?auto=format&fit=crop&w=1000&q=85"/><div><h3>Community Support</h3><p>Helping neighbourhoods build stronger foundations.</p></div></article><article class="work-card"><img alt="Education support" src="https://images.unsplash.com/photo-1509062522246-3755977927d7?auto=format&fit=crop&w=700&q=85"/><div><h3>Education</h3><p>Creating pathways for learning and opportunity.</p></div></article><article class="work-card"><img alt="Healthcare outreach" src="https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=700&q=85"/><div><h3>Healthcare</h3><p>Care that reaches people where they are.</p></div></article><article class="work-card"><img alt="Environmental community action" src="https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?auto=format&fit=crop&w=700&q=85"/><div><h3>Environmental Action</h3><p>Growing a more resilient future together.</p></div></article></div>
+    <div class="work-grid"><article class="work-card"><img alt="Community support" src="https://images.unsplash.com/photo-1489493585363-d694e8a1035e?auto=format&fit=crop&w=700&q=85"/><div><h3>Community Support</h3><p>Helping neighbourhoods build stronger foundations.</p></div></article><article class="work-card"><img alt="Education support" src="https://images.unsplash.com/photo-1509062522246-3755977927d7?auto=format&fit=crop&w=700&q=85"/><div><h3>Education</h3><p>Creating pathways for learning and opportunity.</p></div></article><article class="work-card"><img alt="Healthcare outreach" src="https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=700&q=85"/><div><h3>Healthcare</h3><p>Care that reaches people where they are.</p></div></article><article class="work-card"><img alt="Environmental community action" src="https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?auto=format&fit=crop&w=700&q=85"/><div><h3>Environmental Action</h3><p>Growing a more resilient future together.</p></div></article></div>
   </section>
 
   <section class="section"><div class="section-head"><p class="section-eyebrow">Powering our people</p><h2>The platform capabilities live today.</h2></div><div class="cap-grid"><article class="cap-card"><img alt="Volunteers collaborating" src="https://images.unsplash.com/photo-1559027615-cd4628902d4a?auto=format&fit=crop&w=700&q=85"/><div><h3>Volunteer Management</h3><p>Manage profiles, skills, verification and working hours in one place.</p></div></article><article class="cap-card"><img alt="Community support in action" src="https://images.unsplash.com/photo-1469571486292-0ba58a3f068b?auto=format&fit=crop&w=700&q=85"/><div><h3>Beneficiary Management</h3><p>Securely maintain beneficiary records and track support provided over time.</p></div></article><article class="cap-card"><img alt="Secure abstract visual" src="https://images.unsplash.com/photo-1563013544-824ae1b704d3?auto=format&fit=crop&w=700&q=85"/><div><h3>Secure Access</h3><p>Role-based access keeps sensitive information with authorized users.</p></div></article></div></section>
@@ -783,11 +888,11 @@ function landingPage() {
     </div>
   </section>
 
-  <section class="involved" id="get-involved"><div class="section"><div class="section-head"><p class="section-eyebrow">Get involved</p><h2>There is a place for everyone.</h2></div><div class="involved-grid"><article class="involved-card"><small>VOLUNTEER</small><h3>Give your time and skills.</h3><p>Bring your care and experience to work that matters.</p><a class="link" href="/register?role=Volunteer">Become a volunteer →</a></article><article class="involved-card"><small>SUPPORT</small><h3>Stand with communities.</h3><p>Donation records are managed by our team — reach out to discuss giving.</p><span class="coming-soon-tag">Staff-managed</span></article><article class="involved-card"><small>PARTNER</small><h3>Work together for impact.</h3><p>Partnership opportunities are coming soon.</p><span class="coming-soon-tag">Coming soon</span></article></div></div></section>
+  <section class="involved" id="get-involved"><div class="section"><div class="section-head"><p class="section-eyebrow">Get involved</p><h2>There is a place for everyone.</h2></div><div class="involved-grid"><article class="involved-card"><small>VOLUNTEER</small><h3>Give your time and skills.</h3><p>Bring your care and experience to work that matters.</p><a class="link" href="/register?role=Volunteer">Become a volunteer →</a></article><article class="involved-card"><small>SUPPORT</small><h3>Stand with communities.</h3><p>Register as a donor to record your gifts and track your giving history with us.</p><a class="link" href="/register?role=Donor">Become a donor →</a></article><article class="involved-card"><small>PARTNER</small><h3>Work together for impact.</h3><p>Partnership opportunities are coming soon.</p><span class="coming-soon-tag">Coming soon</span></article></div></div></section>
   <section class="photo-cta"><div><h2>Change starts with people.</h2><p>Be part of something bigger than yourself.</p><a class="btn-primary" href="/register">Join ABC Foundation</a></div></section>
 
   <footer class="site-footer">
-    <div class="footer-grid"><div><a class="site-brand" href="/">${HEART_GLYPH}<span>ABC FOUNDATION</span></a><p>Empowering Communities. Creating Lasting Change.</p></div><div><h4>EXPLORE</h4><a href="/">Home</a><a href="#about">About</a><a href="#our-work">Our Work</a><a href="#get-involved">Get Involved</a></div><div><h4>PLATFORM</h4><a href="/login">Login</a><a href="/register">Register</a><a href="#">Projects — Coming Soon</a><a href="/login">Donations (staff portal)</a></div></div><div class="site-footer-inner"><p>© 2026 ABC Foundation</p></div>
+    <div class="footer-grid"><div><a class="site-brand" href="/">${HEART_GLYPH}<span>ABC FOUNDATION</span></a><p>Empowering Communities. Creating Lasting Change.</p></div><div><h4>EXPLORE</h4><a href="/">Home</a><a href="#about">About</a><a href="#our-work">Our Work</a><a href="#get-involved">Get Involved</a></div><div><h4>PLATFORM</h4><a href="/login">Login</a><a href="/register?role=Donor">Become a Donor</a><a href="/register">Register</a></div></div><div class="site-footer-inner"><p>© 2026 ABC Foundation</p></div>
   </footer>
 <script>document.getElementById('menuBtn').addEventListener('click',function(){document.getElementById('mobileMenu').classList.toggle('open')})</script>
 </body>
@@ -1157,6 +1262,7 @@ function sidebarLinks(role) {
     return [
       { key: "dashboard", href: "/dashboard", label: "⌂  Dashboard" },
       { key: "donations", href: "/my-donations", label: "♥  My Donations" },
+      { key: "new-donation", href: "/my-donations/new", label: "+  Record a Donation" },
     ];
   }
   // Project Manager, Super Admin
@@ -1209,6 +1315,7 @@ function appShell(user, activeNav, innerHtml, titleSuffix) {
     </div>
   </div>
 ${LOGOUT_SCRIPT}
+${FORM_UX_SCRIPT}
 </body>
 </html>`;
 }
@@ -1227,10 +1334,7 @@ function dashboardPage(user, data) {
       : `<span class="hint-text">No skills on file yet.</span>`;
 
     content = `
-      <div class="page-head">
-        <h1>Welcome, ${escapeHtml(user.name.split(" ")[0])}</h1>
-        <p>Here's a snapshot of your volunteer profile.</p>
-      </div>
+      ${pageHead("dashboard", `Welcome, ${user.name.split(" ")[0]}`, "Here's a snapshot of your volunteer profile.")}
       <div class="card">
         <dl>
           <dt>Status</dt><dd><span class="badge ${verified ? "badge-verified" : "badge-pending"}">${verified ? "Verified" : "Pending verification"}</span></dd>
@@ -1259,17 +1363,14 @@ function dashboardPage(user, data) {
       : `<span class="hint-text">No received donations yet.</span>`;
     const recentRows = donations.slice(0, 5).map((d) => `
         <tr>
-          <td>${escapeHtml(new Date(d.donationDate).toLocaleDateString())}</td>
-          <td>${escapeHtml(formatMoney(d.amount, d.currency))}</td>
-          <td>${escapeHtml(d.purpose || "—")}</td>
-          <td><span class="badge ${donationStatusClass(d.status)}">${escapeHtml(d.status)}</span></td>
+          <td data-label="Date">${escapeHtml(new Date(d.donationDate).toLocaleDateString())}</td>
+          <td data-label="Amount">${escapeHtml(formatMoney(d.amount, d.currency))}</td>
+          <td data-label="Purpose">${escapeHtml(d.purpose || "—")}</td>
+          <td data-label="Status"><span class="badge ${donationStatusClass(d.status)}">${escapeHtml(d.status)}</span></td>
         </tr>`).join("");
 
     content = `
-      <div class="page-head">
-        <h1>Welcome, ${escapeHtml(user.name.split(" ")[0])}</h1>
-        <p>Here's a snapshot of your giving history.</p>
-      </div>
+      ${pageHead("dashboard", `Welcome, ${user.name.split(" ")[0]}`, "Here's a snapshot of your giving history.")}
       <div class="card">
         <dl>
           <dt>Total received</dt><dd>${totalsHtml}</dd>
@@ -1277,18 +1378,22 @@ function dashboardPage(user, data) {
         </dl>
       </div>
       <div class="card">
-        <h3>Recent donations</h3>
-        <p class="card-sub">Manual / Offline Record — entered by ABC Foundation staff. No online payment is processed here.</p>
+        <div class="row-between" style="margin-bottom:4px;flex-wrap:wrap;gap:10px;">
+          <h3 style="margin:0">Recent donations</h3>
+          <a class="btn-small primary" href="/my-donations/new">+ Record a Donation</a>
+        </div>
+        <p class="card-sub">Manual / Offline Record — entered by you or by ABC Foundation staff. No online payment is processed here.</p>
         <div class="table-wrap">
           <table class="table">
             <thead><tr><th>Date</th><th>Amount</th><th>Purpose</th><th>Status</th></tr></thead>
-            <tbody>${recentRows || `<tr><td colspan="4" class="empty-state">No donations recorded yet.</td></tr>`}</tbody>
+            <tbody>${donations.length ? recentRows : emptyRow(4, "No donations recorded yet.")}</tbody>
           </table>
         </div>
       </div>
       <div class="card">
         <h3>Quick actions</h3>
         <div class="quick-actions">
+          <a class="btn-primary" href="/my-donations/new">Record a donation</a>
           <a class="btn-primary" href="/my-donations">View all my donations</a>
         </div>
       </div>`;
@@ -1298,44 +1403,41 @@ function dashboardPage(user, data) {
     const activityRows = recentActivity.length
       ? recentActivity.map((r) => `
           <tr>
-            <td>${escapeHtml(r.volunteerName)}</td>
-            <td>${r.skills ? escapeHtml(r.skills.split(",")[0].trim()) : "—"}</td>
-            <td><span class="badge ${r.verifiedStatus === "Verified" ? "badge-verified" : "badge-pending"}">${escapeHtml(r.verifiedStatus)}</span></td>
-            <td>${escapeHtml(r.hoursLogged)}</td>
-            <td><span class="badge badge-${r.status.toLowerCase()}">${escapeHtml(r.status)}</span></td>
+            <td data-label="Volunteer">${escapeHtml(r.volunteerName)}</td>
+            <td data-label="Skill">${r.skills ? escapeHtml(r.skills.split(",")[0].trim()) : "—"}</td>
+            <td data-label="Verification"><span class="badge ${r.verifiedStatus === "Verified" ? "badge-verified" : "badge-pending"}">${escapeHtml(r.verifiedStatus)}</span></td>
+            <td data-label="Hours">${escapeHtml(r.hoursLogged)}</td>
+            <td data-label="Status"><span class="badge badge-${r.status.toLowerCase()}">${escapeHtml(r.status)}</span></td>
           </tr>`).join("")
-      : `<tr><td colspan="5" class="empty-state">No volunteer activity yet.</td></tr>`;
+      : emptyRow(5, "No volunteer activity yet.");
 
     const beneficiaryRows = recentBeneficiaries.length
       ? recentBeneficiaries.map((b) => `
           <tr>
-            <td>${escapeHtml(b.fullName)}</td>
-            <td>${escapeHtml(b.location)}</td>
-            <td>${escapeHtml(b.supportReceived || "—")}</td>
-            <td>${escapeHtml(new Date(b.createdAt).toLocaleDateString())}</td>
+            <td data-label="Name">${escapeHtml(b.fullName)}</td>
+            <td data-label="Location">${escapeHtml(b.location)}</td>
+            <td data-label="Support received">${escapeHtml(b.supportReceived || "—")}</td>
+            <td data-label="Created">${escapeHtml(new Date(b.createdAt).toLocaleDateString())}</td>
           </tr>`).join("")
-      : `<tr><td colspan="4" class="empty-state">No beneficiaries yet.</td></tr>`;
+      : emptyRow(4, "No beneficiaries yet.");
 
     const donationRows = recentDonations && recentDonations.length
       ? recentDonations.map((d) => `
           <tr>
-            <td>${escapeHtml(d.donorName)}</td>
-            <td>${escapeHtml(formatMoney(d.amount, d.currency))}</td>
-            <td>${escapeHtml(d.purpose || "—")}</td>
-            <td><span class="badge ${donationStatusClass(d.status)}">${escapeHtml(d.status)}</span></td>
-            <td>${escapeHtml(new Date(d.donationDate).toLocaleDateString())}</td>
+            <td data-label="Donor">${escapeHtml(d.donorName)}</td>
+            <td data-label="Amount">${escapeHtml(formatMoney(d.amount, d.currency))}</td>
+            <td data-label="Purpose">${escapeHtml(d.purpose || "—")}</td>
+            <td data-label="Status"><span class="badge ${donationStatusClass(d.status)}">${escapeHtml(d.status)}</span></td>
+            <td data-label="Date">${escapeHtml(new Date(d.donationDate).toLocaleDateString())}</td>
           </tr>`).join("")
-      : `<tr><td colspan="5" class="empty-state">No donations recorded yet.</td></tr>`;
+      : emptyRow(5, "No donations recorded yet.");
 
     const donationTotalsHtml = donationStats && donationStats.totalsByCurrency.length
       ? donationStats.totalsByCurrency.map((t) => `<div>${escapeHtml(formatMoney(t.total, t.currency))}</div>`).join("")
       : `<span class="hint-text">None yet</span>`;
 
     content = `
-      <div class="page-head">
-        <h1>Welcome, ${escapeHtml(user.name.split(" ")[0])}</h1>
-        <p>Here's what's happening across the platform.</p>
-      </div>
+      ${pageHead("dashboard", `Welcome, ${user.name.split(" ")[0]}`, "Here's what's happening across the platform.")}
 
       <div class="stat-grid">
         <div class="stat-card"><div class="stat-label">Total Volunteers</div><div class="stat-value">${stats.totalVolunteers}</div></div>
@@ -1368,7 +1470,7 @@ function dashboardPage(user, data) {
 
       <div class="card">
         <div class="row-between" style="margin-bottom:4px;flex-wrap:wrap;gap:10px;">
-          <h3 style="margin:0">Donations ${donationTotalsHtml ? "" : ""}</h3>
+          <h3 style="margin:0">Donations</h3>
           <div style="font-size:13px;color:var(--muted);">${donationTotalsHtml}</div>
         </div>
         <p class="card-sub">Manual / Offline Record — ${donationStats ? donationStats.pendingCount : 0} pending, ${donationStats ? donationStats.donorCount : 0} donors on file. No payment gateway is connected.</p>
@@ -1385,6 +1487,7 @@ function dashboardPage(user, data) {
         <div class="quick-actions">
           <a class="btn-primary" href="/volunteers">Manage Volunteers</a>
           <a class="btn-primary" href="/beneficiaries">Manage Beneficiaries</a>
+          <a class="btn-primary" href="/projects">Manage Projects</a>
           <a class="btn-primary" href="/donations">Manage Donations</a>
         </div>
       </div>`;
@@ -1429,7 +1532,7 @@ body{ min-height:100vh; display:flex; align-items:center; justify-content:center
 }
 
 /* ---------- Volunteer: self-service profile ---------- */
-function volunteerProfilePage(user, volunteerRecord, hourLogs) {
+function volunteerProfilePage(user, volunteerRecord, hourLogs, flash) {
   const skills = volunteerRecord ? volunteerRecord.skills : "";
   const verified = volunteerRecord && volunteerRecord.verifiedStatus === "Verified";
   const skillTags = skills
@@ -1440,18 +1543,16 @@ function volunteerProfilePage(user, volunteerRecord, hourLogs) {
   const rows = hourLogs.length
     ? hourLogs.map((h) => `
         <tr>
-          <td>${escapeHtml(h.taskName)}</td>
-          <td>${escapeHtml(new Date(h.dateLogged).toLocaleDateString())}</td>
-          <td>${escapeHtml(h.hoursLogged)}</td>
-          <td><span class="badge badge-${h.status.toLowerCase()}">${escapeHtml(h.status)}</span></td>
+          <td data-label="Task">${escapeHtml(h.taskName)}</td>
+          <td data-label="Date">${escapeHtml(new Date(h.dateLogged).toLocaleDateString())}</td>
+          <td data-label="Hours">${escapeHtml(h.hoursLogged)}</td>
+          <td data-label="Status"><span class="badge badge-${h.status.toLowerCase()}">${escapeHtml(h.status)}</span></td>
         </tr>`).join("")
-    : `<tr><td colspan="4" class="empty-state">No hours logged yet.</td></tr>`;
+    : emptyRow(4, "No hours logged yet.");
 
   const content = `
-    <div class="page-head">
-      <h1>My Profile</h1>
-      <p>Keep your skills current and review your working hours.</p>
-    </div>
+    ${pageHead("profile", "My Profile", "Keep your skills current and review your working hours.")}
+    ${flashBanner(flash)}
 
     <div class="card">
       <h3>My Profile</h3>
@@ -1502,7 +1603,7 @@ function volunteerProfilePage(user, volunteerRecord, hourLogs) {
 }
 
 /* ---------- Volunteers: admin ---------- */
-function volunteersAdminPage(user, volunteers, pendingHours, skillFilter) {
+function volunteersAdminPage(user, volunteers, pendingHours, skillFilter, flash) {
   const volunteerRows = volunteers.length
     ? volunteers.map((v) => {
         const skillTags = v.skills
@@ -1512,27 +1613,27 @@ function volunteersAdminPage(user, volunteers, pendingHours, skillFilter) {
         const verified = v.verifiedStatus === "Verified";
         return `
         <tr>
-          <td>${escapeHtml(v.name)}</td>
-          <td>${escapeHtml(v.email)}</td>
-          <td>${skillTags}</td>
-          <td><span class="badge ${verified ? "badge-verified" : "badge-pending"}">${verified ? "Verified" : "Pending"}</span></td>
-          <td>
+          <td data-label="Name">${escapeHtml(v.name)}</td>
+          <td data-label="Email">${escapeHtml(v.email)}</td>
+          <td data-label="Skills">${skillTags}</td>
+          <td data-label="Verification"><span class="badge ${verified ? "badge-verified" : "badge-pending"}">${verified ? "Verified" : "Pending"}</span></td>
+          <td data-label="Actions">
             <form class="inline-form" method="POST" action="/volunteers/${encodeURIComponent(v.userId)}/${verified ? "unverify" : "verify"}">
               <button type="submit" class="btn-small ${verified ? "" : "primary"}">${verified ? "Unverify" : "Verify"}</button>
             </form>
           </td>
         </tr>`;
       }).join("")
-    : `<tr><td colspan="5" class="empty-state">No volunteers match this search.</td></tr>`;
+    : emptyRow(5, "No volunteers match this search.");
 
   const hourRows = pendingHours.length
     ? pendingHours.map((h) => `
         <tr>
-          <td>${escapeHtml(h.volunteerName)}</td>
-          <td>${escapeHtml(h.taskName)}</td>
-          <td>${escapeHtml(h.hoursLogged)}</td>
-          <td>${escapeHtml(new Date(h.dateLogged).toLocaleDateString())}</td>
-          <td>
+          <td data-label="Volunteer">${escapeHtml(h.volunteerName)}</td>
+          <td data-label="Task">${escapeHtml(h.taskName)}</td>
+          <td data-label="Hours">${escapeHtml(h.hoursLogged)}</td>
+          <td data-label="Date">${escapeHtml(new Date(h.dateLogged).toLocaleDateString())}</td>
+          <td data-label="Actions">
             <form class="inline-form" method="POST" action="/hours/${encodeURIComponent(h.id)}/approve">
               <button type="submit" class="btn-small primary">Approve</button>
             </form>
@@ -1541,13 +1642,11 @@ function volunteersAdminPage(user, volunteers, pendingHours, skillFilter) {
             </form>
           </td>
         </tr>`).join("")
-    : `<tr><td colspan="5" class="empty-state">No hours awaiting approval.</td></tr>`;
+    : emptyRow(5, "No hours awaiting approval.");
 
   const content = `
-    <div class="page-head">
-      <h1>Volunteer Management</h1>
-      <p>Search, verify and manage registered volunteers.</p>
-    </div>
+    ${pageHead("volunteers", "Volunteer Management", "Search, verify and manage registered volunteers.")}
+    ${flashBanner(flash)}
 
     <div class="card">
       <div class="section-title-row">
@@ -1555,7 +1654,7 @@ function volunteersAdminPage(user, volunteers, pendingHours, skillFilter) {
       </div>
       <p class="card-sub">Search matches against each volunteer's listed skills.</p>
       <form class="search-row" method="GET" action="/volunteers" style="margin-bottom:16px;">
-        <input type="text" class="search-input" name="skill" placeholder="Search volunteers..." value="${escapeHtml(skillFilter || "")}" />
+        <input type="text" class="search-input" name="skill" placeholder="Search volunteers..." value="${escapeHtml(skillFilter || "")}" aria-label="Search volunteers by skill" />
         <button type="submit" class="btn-small primary">Search</button>
         ${skillFilter ? `<a class="btn-small" href="/volunteers">Clear</a>` : ""}
       </form>
@@ -1582,29 +1681,27 @@ function volunteersAdminPage(user, volunteers, pendingHours, skillFilter) {
 }
 
 /* ---------- Beneficiaries: list ---------- */
-function beneficiariesListPage(user, beneficiaries, search) {
+function beneficiariesListPage(user, beneficiaries, search, flash) {
   const rows = beneficiaries.length
     ? beneficiaries.map((b) => `
         <tr>
-          <td>${escapeHtml(b.beneficiaryId.slice(0, 8))}</td>
-          <td>${escapeHtml(b.fullName)}</td>
-          <td>${escapeHtml(b.location)}</td>
-          <td>${escapeHtml(b.supportReceived || "—")}</td>
-          <td>${escapeHtml(new Date(b.createdAt).toLocaleDateString())}</td>
-          <td><a class="btn-small" href="/beneficiaries/${encodeURIComponent(b.beneficiaryId)}">View</a></td>
+          <td data-label="Beneficiary ID">${escapeHtml(b.beneficiaryId.slice(0, 8))}</td>
+          <td data-label="Full Name">${escapeHtml(b.fullName)}</td>
+          <td data-label="Location">${escapeHtml(b.location)}</td>
+          <td data-label="Support Received">${escapeHtml(b.supportReceived || "—")}</td>
+          <td data-label="Created Date">${escapeHtml(new Date(b.createdAt).toLocaleDateString())}</td>
+          <td data-label="Action"><a class="btn-small" href="/beneficiaries/${encodeURIComponent(b.beneficiaryId)}">View</a></td>
         </tr>`).join("")
-    : `<tr><td colspan="6" class="empty-state">No beneficiaries match this search.</td></tr>`;
+    : emptyRow(6, "No beneficiaries match this search.");
 
   const content = `
-    <div class="page-head">
-      <h1>Beneficiary Management</h1>
-      <p>Securely manage beneficiary records and support history.</p>
-    </div>
+    ${pageHead("beneficiaries", "Beneficiary Management", "Securely manage beneficiary records and support history.")}
+    ${flashBanner(flash)}
 
     <div class="card">
       <div class="row-between" style="margin-bottom:16px; flex-wrap:wrap; gap:12px;">
         <form class="search-row" method="GET" action="/beneficiaries" style="margin-bottom:0;">
-          <input type="text" class="search-input" name="search" placeholder="Search beneficiaries..." value="${escapeHtml(search || "")}" />
+          <input type="text" class="search-input" name="search" placeholder="Search beneficiaries..." value="${escapeHtml(search || "")}" aria-label="Search beneficiaries by name or location" />
           <button type="submit" class="btn-small primary">Search</button>
           ${search ? `<a class="btn-small" href="/beneficiaries">Clear</a>` : ""}
         </form>
@@ -1624,14 +1721,11 @@ function beneficiariesListPage(user, beneficiaries, search) {
 /* ---------- Beneficiaries: create ---------- */
 function beneficiaryNewPage(user, errorMessage) {
   const content = `
-    <div class="page-head">
-      <h1>Add New Beneficiary</h1>
-      <p>Beneficiary information is restricted to authorized NGO personnel.</p>
-    </div>
+    ${pageHead("beneficiaries", "Add New Beneficiary", "Beneficiary information is restricted to authorized NGO personnel.")}
 
     <div class="card" style="max-width:520px;">
       ${errorMessage ? `<div class="alert alert-error">${escapeHtml(errorMessage)}</div>` : ""}
-      <form method="POST" action="/beneficiaries" class="stack">
+      <form method="POST" action="/beneficiaries" class="stack" novalidate>
         <div class="field">
           <label for="fullName">Full Name</label>
           <input type="text" id="fullName" name="fullName" placeholder="Deepa Nair" required />
@@ -1657,22 +1751,26 @@ function beneficiaryNewPage(user, errorMessage) {
 }
 
 /* ---------- Beneficiaries: detail ---------- */
-function beneficiaryDetailPage(user, beneficiary, aidLog) {
+function beneficiaryDetailPage(user, beneficiary, aidLog, flash) {
   const rows = aidLog.length
     ? aidLog.map((a) => `
         <tr>
-          <td>${escapeHtml(new Date(a.dateProvided).toLocaleDateString())}</td>
-          <td>${escapeHtml(a.aidType || "—")}</td>
-          <td>${escapeHtml(a.description)}</td>
-          <td>${escapeHtml(a.recordedBy || "—")}</td>
+          <td data-label="Date">${escapeHtml(new Date(a.dateProvided).toLocaleDateString())}</td>
+          <td data-label="Aid Type">${escapeHtml(a.aidType || "—")}</td>
+          <td data-label="Description">${escapeHtml(a.description)}</td>
+          <td data-label="Recorded By">${escapeHtml(a.recordedBy || "—")}</td>
         </tr>`).join("")
-    : `<tr><td colspan="4" class="empty-state">No aid logged yet.</td></tr>`;
+    : emptyRow(4, "No aid logged yet.");
 
   const content = `
     <div class="page-head">
-      <h1>Beneficiary Profile</h1>
+      <div class="page-head-row">
+        <span class="page-head-icon">${ICONS.beneficiaries}</span>
+        <h1>${escapeHtml(beneficiary.fullName)}</h1>
+      </div>
       <p><a class="link" href="/beneficiaries">← Back to all beneficiaries</a></p>
     </div>
+    ${flashBanner(flash)}
 
     <div class="card">
       <dl>
@@ -1696,7 +1794,7 @@ function beneficiaryDetailPage(user, beneficiary, aidLog) {
 
     <div class="card">
       <h3>Record New Aid</h3>
-      <form method="POST" action="/beneficiaries/${encodeURIComponent(beneficiary.beneficiaryId)}/aid" class="stack">
+      <form method="POST" action="/beneficiaries/${encodeURIComponent(beneficiary.beneficiaryId)}/aid" class="stack" novalidate>
         <div class="field">
           <label for="aidType">Aid Type</label>
           <input type="text" id="aidType" name="aidType" placeholder="Food, Medical, Education, Shelter..." />
@@ -1719,29 +1817,33 @@ function projectStatusClass(status) {
   return status === "Completed" ? "badge-verified" : status === "On Hold" ? "badge-rejected" : status === "Active" ? "badge-approved" : "badge-pending";
 }
 
-function projectListPage(user, projects, search) {
+function projectListPage(user, projects, search, flash) {
   const rows = projects.length ? projects.map((p) => `
-    <tr><td><strong>${escapeHtml(p.name)}</strong><br/><span class="hint-text">${escapeHtml(p.description || "No description")}</span></td>
-    <td>${escapeHtml(p.location || "—")}</td><td><span class="badge ${projectStatusClass(p.status)}">${escapeHtml(p.status)}</span></td>
-    <td><div style="display:flex;align-items:center;gap:8px;min-width:118px"><span style="height:7px;width:74px;background:#e7eee7;border-radius:99px;overflow:hidden"><span style="display:block;height:100%;width:${p.progress}%;background:var(--teal);border-radius:99px"></span></span>${p.progress}%</div></td>
-    <td>${p.endDate ? escapeHtml(new Date(p.endDate).toLocaleDateString()) : "—"}</td><td><a class="btn-small" href="/projects/${encodeURIComponent(p.projectId)}">View</a></td></tr>`).join("")
-    : `<tr><td colspan="6" class="empty-state">No projects match this search. Create the first project to start monitoring work.</td></tr>`;
-  const content = `<div class="page-head"><h1>Project Monitoring</h1><p>Plan community work, record progress, and keep project updates visible to the team.</p></div>
-    <div class="card"><div class="row-between" style="margin-bottom:16px;flex-wrap:wrap;gap:12px"><form class="search-row" method="GET" action="/projects"><input class="search-input" name="search" placeholder="Search projects or locations..." value="${escapeHtml(search || "")}"/><button class="btn-small primary">Search</button>${search ? `<a class="btn-small" href="/projects">Clear</a>` : ""}</form><a class="btn-primary" href="/projects/new">+ New Project</a></div>
+    <tr><td data-label="Project"><strong>${escapeHtml(p.name)}</strong><br/><span class="hint-text">${escapeHtml(p.description || "No description")}</span></td>
+    <td data-label="Location">${escapeHtml(p.location || "—")}</td><td data-label="Status"><span class="badge ${projectStatusClass(p.status)}">${escapeHtml(p.status)}</span></td>
+    <td data-label="Progress"><div style="display:flex;align-items:center;gap:8px;min-width:118px"><span style="height:7px;width:74px;background:#e7eee7;border-radius:99px;overflow:hidden"><span style="display:block;height:100%;width:${p.progress}%;background:var(--teal);border-radius:99px"></span></span>${p.progress}%</div></td>
+    <td data-label="Target date">${p.endDate ? escapeHtml(new Date(p.endDate).toLocaleDateString()) : "—"}</td><td data-label="Action"><a class="btn-small" href="/projects/${encodeURIComponent(p.projectId)}">View</a></td></tr>`).join("")
+    : emptyRow(6, "No projects match this search. Create the first project to start monitoring work.");
+  const content = `
+    ${pageHead("projects", "Project Monitoring", "Plan community work, record progress, and keep project updates visible to the team.")}
+    ${flashBanner(flash)}
+    <div class="card"><div class="row-between" style="margin-bottom:16px;flex-wrap:wrap;gap:12px"><form class="search-row" method="GET" action="/projects"><input class="search-input" name="search" placeholder="Search projects or locations..." value="${escapeHtml(search || "")}" aria-label="Search projects by name or location"/><button class="btn-small primary">Search</button>${search ? `<a class="btn-small" href="/projects">Clear</a>` : ""}</form><a class="btn-primary" href="/projects/new">+ New Project</a></div>
     <div class="table-wrap"><table class="table"><thead><tr><th>Project</th><th>Location</th><th>Status</th><th>Progress</th><th>Target date</th><th>Action</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
   return appShell(user, "projects", content, "Project Monitoring");
 }
 
 function projectNewPage(user, errorMessage) {
   const options = PROJECT_STATUSES.map((s) => `<option value="${s}">${s}</option>`).join("");
-  const content = `<div class="page-head"><h1>Create Project</h1><p>Set the initial scope and schedule for a community initiative.</p></div><div class="card" style="max-width:650px">${errorMessage ? `<div class="alert alert-error">${escapeHtml(errorMessage)}</div>` : ""}<form method="POST" action="/projects" class="stack"><div class="field"><label for="name">Project name</label><input id="name" name="name" required placeholder="e.g. Community Learning Centre"/></div><div class="field"><label for="description">Description</label><input id="description" name="description" placeholder="What will this project deliver?"/></div><div class="field"><label for="location">Location</label><input id="location" name="location" placeholder="District, region or community"/></div><div class="field"><label for="status">Initial status</label><select id="status" name="status">${options}</select></div><div class="field"><label for="progress">Initial progress (%)</label><input type="number" id="progress" name="progress" min="0" max="100" value="0" required/></div><div class="search-row"><div class="field" style="flex:1"><label for="startDate">Start date</label><input type="date" id="startDate" name="startDate"/></div><div class="field" style="flex:1"><label for="endDate">Target completion date</label><input type="date" id="endDate" name="endDate"/></div></div><button class="btn-primary" style="align-self:flex-start">Create Project</button></form></div>`;
+  const content = `${pageHead("projects", "Create Project", "Set the initial scope and schedule for a community initiative.")}<div class="card" style="max-width:650px">${errorMessage ? `<div class="alert alert-error">${escapeHtml(errorMessage)}</div>` : ""}<form method="POST" action="/projects" class="stack" novalidate><div class="field"><label for="name">Project name</label><input id="name" name="name" required placeholder="e.g. Community Learning Centre"/></div><div class="field"><label for="description">Description</label><input id="description" name="description" placeholder="What will this project deliver?"/></div><div class="field"><label for="location">Location</label><input id="location" name="location" placeholder="District, region or community"/></div><div class="field"><label for="status">Initial status</label><select id="status" name="status">${options}</select></div><div class="field"><label for="progress">Initial progress (%)</label><input type="number" id="progress" name="progress" min="0" max="100" value="0" required/></div><div class="search-row"><div class="field" style="flex:1"><label for="startDate">Start date</label><input type="date" id="startDate" name="startDate"/></div><div class="field" style="flex:1"><label for="endDate">Target completion date</label><input type="date" id="endDate" name="endDate"/></div></div><button class="btn-primary" style="align-self:flex-start">Create Project</button></form></div>`;
   return appShell(user, "projects", content, "Create Project");
 }
 
-function projectDetailPage(user, project, updates) {
+function projectDetailPage(user, project, updates, flash) {
   const options = PROJECT_STATUSES.map((s) => `<option value="${s}" ${s === project.status ? "selected" : ""}>${s}</option>`).join("");
-  const timeline = updates.length ? updates.map((u) => `<div style="border-left:2px solid var(--teal);padding:0 0 20px 18px;margin-left:6px"><div style="font-size:12px;color:var(--muted);margin-bottom:5px">${escapeHtml(new Date(u.createdAt).toLocaleDateString())} · ${escapeHtml(u.recordedBy)}</div><strong>${escapeHtml(u.status)} · ${u.progress}%</strong><p style="margin:6px 0 0;color:var(--muted);font-size:13px">${escapeHtml(u.note)}</p></div>`).join("") : `<div class="empty-state">No progress updates recorded yet.</div>`;
-  const content = `<div class="page-head"><h1>${escapeHtml(project.name)}</h1><p><a class="link" href="/projects">← Back to all projects</a></p></div><div class="card"><dl><dt>Status</dt><dd><span class="badge ${projectStatusClass(project.status)}">${escapeHtml(project.status)}</span></dd><dt>Progress</dt><dd>${project.progress}%</dd><dt>Location</dt><dd>${escapeHtml(project.location || "—")}</dd><dt>Schedule</dt><dd>${project.startDate ? escapeHtml(new Date(project.startDate).toLocaleDateString()) : "TBD"} — ${project.endDate ? escapeHtml(new Date(project.endDate).toLocaleDateString()) : "TBD"}</dd><dt>Project owner</dt><dd>${escapeHtml(project.createdByName)}</dd><dt>Description</dt><dd>${escapeHtml(project.description || "—")}</dd></dl></div><div class="card"><h3>Project Updates</h3><p class="card-sub">A chronological record of project delivery and decisions.</p>${timeline}</div><div class="card"><h3>Record Progress Update</h3><p class="card-sub">This updates the project’s current status and progress.</p><form method="POST" action="/projects/${encodeURIComponent(project.projectId)}/updates" class="stack"><div class="field"><label for="note">Update note</label><input id="note" name="note" required placeholder="What changed, happened, or needs attention?"/></div><div class="search-row"><div class="field" style="flex:1"><label for="progress">Progress (%)</label><input type="number" id="progress" name="progress" min="0" max="100" value="${project.progress}" required/></div><div class="field" style="flex:1"><label for="status">Status</label><select id="status" name="status">${options}</select></div></div><button class="btn-primary" style="align-self:flex-start">Save Update</button></form></div>`;
+  const timeline = updates.length ? updates.map((u) => `<div style="border-left:2px solid var(--teal);padding:0 0 20px 18px;margin-left:6px"><div style="font-size:12px;color:var(--muted);margin-bottom:5px">${escapeHtml(new Date(u.createdAt).toLocaleDateString())} · ${escapeHtml(u.recordedBy)}</div><strong>${escapeHtml(u.status)} · ${u.progress}%</strong><p style="margin:6px 0 0;color:var(--muted);font-size:13px">${escapeHtml(u.note)}</p></div>`).join("") : `<div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M3 11h4.5a1 1 0 0 1 .9.55l.7 1.4a1 1 0 0 0 .9.55h3a1 1 0 0 0 .9-.55l.7-1.4a1 1 0 0 1 .9-.55H21"/><path d="M7 7V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2"/></svg><span>No progress updates recorded yet.</span></div>`;
+  const content = `<div class="page-head"><div class="page-head-row"><span class="page-head-icon">${ICONS.projects}</span><h1>${escapeHtml(project.name)}</h1></div><p><a class="link" href="/projects">← Back to all projects</a></p></div>
+    ${flashBanner(flash)}
+    <div class="card"><dl><dt>Status</dt><dd><span class="badge ${projectStatusClass(project.status)}">${escapeHtml(project.status)}</span></dd><dt>Progress</dt><dd>${project.progress}%</dd><dt>Location</dt><dd>${escapeHtml(project.location || "—")}</dd><dt>Schedule</dt><dd>${project.startDate ? escapeHtml(new Date(project.startDate).toLocaleDateString()) : "TBD"} — ${project.endDate ? escapeHtml(new Date(project.endDate).toLocaleDateString()) : "TBD"}</dd><dt>Project owner</dt><dd>${escapeHtml(project.createdByName)}</dd><dt>Description</dt><dd>${escapeHtml(project.description || "—")}</dd></dl></div><div class="card"><h3>Project Updates</h3><p class="card-sub">A chronological record of project delivery and decisions.</p>${timeline}</div><div class="card"><h3>Record Progress Update</h3><p class="card-sub">This updates the project’s current status and progress.</p><form method="POST" action="/projects/${encodeURIComponent(project.projectId)}/updates" class="stack" novalidate><div class="field"><label for="note">Update note</label><input id="note" name="note" required placeholder="What changed, happened, or needs attention?"/></div><div class="search-row"><div class="field" style="flex:1"><label for="progress">Progress (%)</label><input type="number" id="progress" name="progress" min="0" max="100" value="${project.progress}" required/></div><div class="field" style="flex:1"><label for="status">Status</label><select id="status" name="status">${options}</select></div></div><button class="btn-primary" style="align-self:flex-start">Save Update</button></form></div>`;
   return appShell(user, "projects", content, project.name);
 }
 
@@ -1760,19 +1862,47 @@ function formatMoney(amount, currency) {
   return `${currency || "USD"} ${formatted}`;
 }
 
-function donationListPage(user, donations, filters, stats) {
+// Shared validation for the amount/currency/date/payment-method fields that
+// both the admin "Record Donation" form and the donor "Record My Donation"
+// self-service form collect. Donor identity (name/email) is validated
+// separately by each route, since the admin form takes it from the body and
+// the donor route always takes it from the signed-in account.
+function validateDonationCore(body) {
+  const amount = Number(body.amount);
+  const currency = String(body.currency || "USD").trim().toUpperCase();
+  const donationDate = String(body.donationDate || "");
+  const paymentMethod = String(body.paymentMethod || "");
+  const purpose = String(body.purpose || "").trim() || "General Fund";
+  const referenceNumber = String(body.referenceNumber || "").trim();
+
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return { error: "Enter a donation amount greater than zero." };
+  }
+  if (!CURRENCIES.includes(currency)) {
+    return { error: "Select a valid currency." };
+  }
+  if (!donationDate || Number.isNaN(Date.parse(donationDate))) {
+    return { error: "Enter a valid donation date." };
+  }
+  if (!PAYMENT_METHODS.includes(paymentMethod)) {
+    return { error: "Select a valid payment method." };
+  }
+  return { amount, currency, donationDate, paymentMethod, purpose, referenceNumber };
+}
+
+function donationListPage(user, donations, filters, stats, flash) {
   const rows = donations.length
     ? donations.map((d) => `
         <tr>
-          <td>${escapeHtml(d.donorName)}<br/><span class="hint-text" style="margin:0;">${escapeHtml(d.donorEmail)}</span></td>
-          <td>${escapeHtml(formatMoney(d.amount, d.currency))}</td>
-          <td>${escapeHtml(d.paymentMethod)}</td>
-          <td>${escapeHtml(d.purpose || "—")}</td>
-          <td><span class="badge ${donationStatusClass(d.status)}">${escapeHtml(d.status)}</span></td>
-          <td>${escapeHtml(new Date(d.donationDate).toLocaleDateString())}</td>
-          <td><a class="btn-small" href="/donations/${encodeURIComponent(d.donationId)}">View</a></td>
+          <td data-label="Donor">${escapeHtml(d.donorName)}<br/><span class="hint-text" style="margin:0;">${escapeHtml(d.donorEmail)}</span></td>
+          <td data-label="Amount">${escapeHtml(formatMoney(d.amount, d.currency))}</td>
+          <td data-label="Method">${escapeHtml(d.paymentMethod)}</td>
+          <td data-label="Purpose">${escapeHtml(d.purpose || "—")}</td>
+          <td data-label="Status"><span class="badge ${donationStatusClass(d.status)}">${escapeHtml(d.status)}</span></td>
+          <td data-label="Date">${escapeHtml(new Date(d.donationDate).toLocaleDateString())}</td>
+          <td data-label="Action"><a class="btn-small" href="/donations/${encodeURIComponent(d.donationId)}">View</a></td>
         </tr>`).join("")
-    : `<tr><td colspan="7" class="empty-state">No donations match these filters.</td></tr>`;
+    : emptyRow(7, "No donations match these filters.");
 
   const statusOptions = ["", ...DONATION_STATUSES]
     .map((s) => `<option value="${s}" ${filters.status === s ? "selected" : ""}>${s || "All statuses"}</option>`).join("");
@@ -1784,10 +1914,8 @@ function donationListPage(user, donations, filters, stats) {
     : `<span class="hint-text">No donations received yet.</span>`;
 
   const content = `
-    <div class="page-head">
-      <h1>Donation Processing</h1>
-      <p>Manual / Offline Record keeping — no payment gateway is connected. Every entry below was recorded by staff.</p>
-    </div>
+    ${pageHead("donations", "Donation Processing", "Manual / Offline Record keeping — no payment gateway is connected. Every entry below was recorded by staff or self-reported by a donor.")}
+    ${flashBanner(flash)}
 
     <div class="stat-grid">
       <div class="stat-card"><div class="stat-label">Total Received</div><div class="stat-value" style="font-size:19px;line-height:1.5;">${totalsHtml}</div></div>
@@ -1797,7 +1925,7 @@ function donationListPage(user, donations, filters, stats) {
     </div>
 
     <div class="card">
-      <form class="stack" method="GET" action="/donations" style="margin-bottom:18px;">
+      <form method="GET" action="/donations" style="margin-bottom:18px;">
         <div class="search-row" style="flex-wrap:wrap;">
           <input type="text" class="search-input" name="donor" placeholder="Donor name or email" value="${escapeHtml(filters.donor || "")}" aria-label="Search by donor name or email" />
           <select class="search-input" name="status" style="width:170px;" aria-label="Filter by status">${statusOptions}</select>
@@ -1832,10 +1960,7 @@ function donationNewPage(user, errorMessage, values) {
     .map((c) => `<option value="${c}" ${(values.currency || "USD") === c ? "selected" : ""}>${c}</option>`).join("");
 
   const content = `
-    <div class="page-head">
-      <h1>Record Donation</h1>
-      <p>Manual / Offline Record — enter details for a donation received outside the platform. No payment gateway is connected.</p>
-    </div>
+    ${pageHead("donations", "Record Donation", "Manual / Offline Record — enter details for a donation received outside the platform. No payment gateway is connected.")}
     <div class="card" style="max-width:640px;">
       <div class="alert" style="background:var(--warn-bg);color:var(--warn-ink);">This form records a donation manually. It does not charge a card or process any payment.</div>
       ${errorMessage ? `<div class="alert alert-error">${escapeHtml(errorMessage)}</div>` : ""}
@@ -1889,28 +2014,32 @@ function donationNewPage(user, errorMessage, values) {
   return appShell(user, "donations", content, "Record Donation");
 }
 
-function donationDetailPage(user, donation, history) {
+function donationDetailPage(user, donation, history, flash) {
   const statusOptions = DONATION_STATUSES
     .map((s) => `<option value="${s}" ${s === donation.status ? "selected" : ""}>${s}</option>`).join("");
 
   const historyRows = history.length
     ? history.map((h) => `
         <tr>
-          <td>${escapeHtml(new Date(h.changedAt).toLocaleString())}</td>
-          <td>${h.oldStatus ? escapeHtml(h.oldStatus) + " → " : ""}<strong>${escapeHtml(h.newStatus)}</strong></td>
-          <td>${escapeHtml(h.changedBy)}</td>
-          <td>${escapeHtml(h.note || "—")}</td>
+          <td data-label="When">${escapeHtml(new Date(h.changedAt).toLocaleString())}</td>
+          <td data-label="Change">${h.oldStatus ? escapeHtml(h.oldStatus) + " → " : ""}<strong>${escapeHtml(h.newStatus)}</strong></td>
+          <td data-label="Changed By">${escapeHtml(h.changedBy)}</td>
+          <td data-label="Note">${escapeHtml(h.note || "—")}</td>
         </tr>`).join("")
-    : `<tr><td colspan="4" class="empty-state">No history recorded.</td></tr>`;
+    : emptyRow(4, "No history recorded.");
 
   const content = `
     <div class="page-head">
-      <h1>Donation #${escapeHtml(donation.donationId.slice(0, 8))}</h1>
+      <div class="page-head-row">
+        <span class="page-head-icon">${ICONS.donations}</span>
+        <h1>Donation #${escapeHtml(donation.donationId.slice(0, 8))}</h1>
+      </div>
       <p><a class="link" href="/donations">← Back to all donations</a></p>
     </div>
+    ${flashBanner(flash)}
 
     <div class="card">
-      <div class="alert" style="background:var(--warn-bg);color:var(--warn-ink);">Manual / Offline Record — no payment gateway is connected. This reflects a donation entered by staff.</div>
+      <div class="alert" style="background:var(--warn-bg);color:var(--warn-ink);">Manual / Offline Record — no payment gateway is connected. This reflects a donation entered by staff or self-reported by the donor.</div>
       <dl>
         <dt>Donor Name</dt><dd>${escapeHtml(donation.donorName)}</dd>
         <dt>Donor Email</dt><dd>${escapeHtml(donation.donorEmail)}</dd>
@@ -1967,24 +2096,32 @@ function donationDetailPage(user, donation, history) {
   return appShell(user, "donations", content, "Donation Detail");
 }
 
-function myDonationsPage(user, donations) {
+function myDonationsPage(user, donations, flash) {
   const rows = donations.length
     ? donations.map((d) => `
         <tr>
-          <td>${escapeHtml(new Date(d.donationDate).toLocaleDateString())}</td>
-          <td>${escapeHtml(formatMoney(d.amount, d.currency))}</td>
-          <td>${escapeHtml(d.purpose || "—")}</td>
-          <td><span class="badge ${donationStatusClass(d.status)}">${escapeHtml(d.status)}</span></td>
-          <td><a class="btn-small" href="/my-donations/${encodeURIComponent(d.donationId)}">View Receipt</a></td>
+          <td data-label="Date">${escapeHtml(new Date(d.donationDate).toLocaleDateString())}</td>
+          <td data-label="Amount">${escapeHtml(formatMoney(d.amount, d.currency))}</td>
+          <td data-label="Purpose">${escapeHtml(d.purpose || "—")}</td>
+          <td data-label="Status"><span class="badge ${donationStatusClass(d.status)}">${escapeHtml(d.status)}</span></td>
+          <td data-label="Action"><a class="btn-small" href="/my-donations/${encodeURIComponent(d.donationId)}">View Receipt</a></td>
         </tr>`).join("")
-    : `<tr><td colspan="5" class="empty-state">You don't have any donations on record yet.</td></tr>`;
+    : emptyRow(5, "You don't have any donations on record yet.");
 
   const content = `
     <div class="page-head">
-      <h1>My Donations</h1>
-      <p>Your donation history as recorded by ABC Foundation staff. Manual / Offline Record — no online payment is processed here.</p>
+      <div class="page-head-row">
+        <span class="page-head-icon">${ICONS.donations}</span>
+        <h1>My Donations</h1>
+      </div>
+      <p>Your donation history — entered by you or by ABC Foundation staff. Manual / Offline Record — no online payment is processed here.</p>
     </div>
+    ${flashBanner(flash)}
     <div class="card">
+      <div class="row-between" style="margin-bottom:16px;flex-wrap:wrap;gap:12px;">
+        <span class="hint-text" style="margin:0;">${donations.length} donation${donations.length === 1 ? "" : "s"} on file</span>
+        <a class="btn-primary" href="/my-donations/new">+ Record a Donation</a>
+      </div>
       <div class="table-wrap">
         <table class="table">
           <thead><tr><th>Date</th><th>Amount</th><th>Purpose</th><th>Status</th><th>Action</th></tr></thead>
@@ -1996,14 +2133,18 @@ function myDonationsPage(user, donations) {
   return appShell(user, "donations", content, "My Donations");
 }
 
-function donationReceiptPage(user, donation) {
+function donationReceiptPage(user, donation, flash) {
   const content = `
     <div class="page-head">
-      <h1>Donation Receipt</h1>
+      <div class="page-head-row">
+        <span class="page-head-icon">${ICONS.receipt}</span>
+        <h1>Donation Receipt</h1>
+      </div>
       <p><a class="link" href="/my-donations">← Back to my donations</a></p>
     </div>
+    ${flashBanner(flash)}
     <div class="card" style="max-width:520px;">
-      <div class="alert" style="background:var(--warn-bg);color:var(--warn-ink);">Manual / Offline Record — this reflects a donation recorded by staff, not an automated payment confirmation.</div>
+      <div class="alert" style="background:var(--warn-bg);color:var(--warn-ink);">Manual / Offline Record — this reflects a donation recorded by you or by staff, not an automated payment confirmation.</div>
       <dl>
         <dt>Amount</dt><dd>${escapeHtml(formatMoney(donation.amount, donation.currency))}</dd>
         <dt>Date</dt><dd>${escapeHtml(new Date(donation.donationDate).toLocaleDateString())}</dd>
@@ -2012,9 +2153,78 @@ function donationReceiptPage(user, donation) {
         <dt>Purpose</dt><dd>${escapeHtml(donation.purpose || "—")}</dd>
         <dt>Reference Number</dt><dd>${escapeHtml(donation.referenceNumber || "—")}</dd>
       </dl>
+      ${donation.status === "Pending" ? `<div class="alert alert-success" style="margin-top:16px;margin-bottom:0;">This donation is awaiting confirmation from our team. We'll update the status once it's verified as received.</div>` : ""}
     </div>`;
 
   return appShell(user, "donations", content, "Donation Receipt");
+}
+
+/* ---------- Donor: self-service "Record My Donation" ---------- */
+// Donor-initiated version of the same Manual / Offline Record. The donor
+// reports a gift they already made outside the platform (cash, bank
+// transfer, etc.) — it always starts 'Pending' and only staff can move it
+// to 'Received', exactly like a staff-entered donation. Donor identity
+// (name/email) is never taken from the form; it's always the signed-in
+// donor's own account, so a donor can't submit a record under someone
+// else's name or email.
+function donationSelfNewPage(user, errorMessage, values) {
+  values = values || {};
+  const methodOptions = PAYMENT_METHODS
+    .map((m) => `<option value="${m}" ${values.paymentMethod === m ? "selected" : ""}>${m}</option>`).join("");
+  const currencyOptions = CURRENCIES
+    .map((c) => `<option value="${c}" ${(values.currency || "USD") === c ? "selected" : ""}>${c}</option>`).join("");
+
+  const content = `
+    ${pageHead("donations", "Record My Donation", "Manual / Offline Record — tell us about a gift you've already made. No payment gateway is connected, so this doesn't charge a card or move any money.")}
+    <div class="card" style="max-width:640px;">
+      <div class="alert" style="background:var(--warn-bg);color:var(--warn-ink);">This records that you gave — it doesn't process a payment. Your gift stays "Pending" until our team confirms it arrived.</div>
+      ${errorMessage ? `<div class="alert alert-error">${escapeHtml(errorMessage)}</div>` : ""}
+      <form method="POST" action="/my-donations" class="stack" novalidate>
+        <div class="field">
+          <label>Donor</label>
+          <input type="text" value="${escapeHtml(user.name)} (${escapeHtml(user.email)})" disabled
+            style="background:var(--bg);color:var(--muted);" />
+          <span class="hint-text">Recorded under your account — this can't be changed here.</span>
+        </div>
+        <div class="search-row">
+          <div class="field" style="flex:1">
+            <label for="amount">Amount</label>
+            <input type="number" id="amount" name="amount" required min="0.01" step="0.01" value="${escapeHtml(values.amount || "")}" placeholder="100.00" />
+          </div>
+          <div class="field" style="flex:1">
+            <label for="currency">Currency</label>
+            <select id="currency" name="currency">${currencyOptions}</select>
+          </div>
+        </div>
+        <div class="search-row">
+          <div class="field" style="flex:1">
+            <label for="donationDate">Donation Date</label>
+            <input type="date" id="donationDate" name="donationDate" required value="${escapeHtml(values.donationDate || "")}" />
+          </div>
+          <div class="field" style="flex:1">
+            <label for="paymentMethod">Payment Method</label>
+            <select id="paymentMethod" name="paymentMethod">${methodOptions}</select>
+            <span class="hint-text">How did you actually send it?</span>
+          </div>
+        </div>
+        <div class="field">
+          <label for="purpose">Purpose / Designation</label>
+          <input type="text" id="purpose" name="purpose" value="${escapeHtml(values.purpose || "")}" placeholder="General Fund, Education, Flood Relief..." />
+        </div>
+        <div class="field">
+          <label for="referenceNumber">Reference Number</label>
+          <input type="text" id="referenceNumber" name="referenceNumber" value="${escapeHtml(values.referenceNumber || "")}" placeholder="Bank transfer ID, receipt #, cheque #..." />
+          <span class="hint-text">Helps our team match this to the funds when they arrive.</span>
+        </div>
+        <div class="field">
+          <label for="notes">Note to our team (optional)</label>
+          <input type="text" id="notes" name="notes" value="${escapeHtml(values.notes || "")}" placeholder="Anything you'd like us to know about this gift" />
+        </div>
+        <button type="submit" class="btn-primary" style="align-self:flex-start;">Record My Donation</button>
+      </form>
+    </div>`;
+
+  return appShell(user, "new-donation", content, "Record My Donation");
 }
 
 /* ============================================================
@@ -2025,6 +2235,20 @@ function donationReceiptPage(user, donation) {
 // error handler instead of crashing the process or hanging the request.
 function asyncRoute(fn) {
   return (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
+}
+
+// One-shot success/error banners that survive a redirect. A POST handler
+// calls setFlash() right before res.redirect(); the GET handler on the other
+// end calls popFlash() once and passes the result into flashBanner().
+// Session-backed, so no schema/table is needed for this.
+function setFlash(req, type, message) {
+  req.session.flash = { type, message };
+}
+
+function popFlash(req) {
+  const flash = req.session.flash;
+  if (flash) delete req.session.flash;
+  return flash || null;
 }
 
 const requireAuth = asyncRoute(async (req, res, next) => {
@@ -2158,12 +2382,13 @@ app.post("/api/logout", (req, res) => {
 app.get("/volunteer/profile", requireAuth, requireRole("Volunteer"), asyncRoute(async (req, res) => {
   const volunteerRecord = await findVolunteerByUserId(req.currentUser.id);
   const hourLogs = await listHoursForVolunteer(req.currentUser.id);
-  res.type("html").send(volunteerProfilePage(req.currentUser, volunteerRecord, hourLogs));
+  res.type("html").send(volunteerProfilePage(req.currentUser, volunteerRecord, hourLogs, popFlash(req)));
 }));
 
 app.post("/volunteer/skills", requireAuth, requireRole("Volunteer"), asyncRoute(async (req, res) => {
   const skills = String(req.body.skills || "").trim();
   await upsertVolunteerSkills(req.currentUser.id, skills);
+  setFlash(req, "success", "Your skills were updated.");
   res.redirect("/volunteer/profile");
 }));
 
@@ -2172,8 +2397,11 @@ app.post("/volunteer/hours", requireAuth, requireRole("Volunteer"), asyncRoute(a
   const hoursLogged = parseFloat(req.body.hoursLogged);
   if (taskName && hoursLogged > 0) {
     await logHours(req.currentUser.id, taskName, hoursLogged);
+    setFlash(req, "success", "Hours logged — a project manager will review them.");
+  } else {
+    setFlash(req, "error", "Enter a task name and a number of hours greater than zero.");
   }
-  res.redirect("/volunteer/profile");
+  res.redirect("/volunteer/profile#hours");
 }));
 
 /* ---------- Volunteer Management: admin (role: Project Manager, Super Admin) ---------- */
@@ -2182,26 +2410,30 @@ app.get("/volunteers", requireAuth, requireRole("Project Manager", "Super Admin"
   const skillFilter = req.query.skill ? String(req.query.skill) : "";
   const volunteers = await listVolunteers(skillFilter);
   const pendingHours = await listPendingHours();
-  res.type("html").send(volunteersAdminPage(req.currentUser, volunteers, pendingHours, skillFilter));
+  res.type("html").send(volunteersAdminPage(req.currentUser, volunteers, pendingHours, skillFilter, popFlash(req)));
 }));
 
 app.post("/volunteers/:id/verify", requireAuth, requireRole("Project Manager", "Super Admin"), asyncRoute(async (req, res) => {
   await setVolunteerVerified(req.params.id, true);
+  setFlash(req, "success", "Volunteer verified.");
   res.redirect("/volunteers");
 }));
 
 app.post("/volunteers/:id/unverify", requireAuth, requireRole("Project Manager", "Super Admin"), asyncRoute(async (req, res) => {
   await setVolunteerVerified(req.params.id, false);
+  setFlash(req, "success", "Volunteer marked as pending verification.");
   res.redirect("/volunteers");
 }));
 
 app.post("/hours/:id/approve", requireAuth, requireRole("Project Manager", "Super Admin"), asyncRoute(async (req, res) => {
   await setHourStatus(req.params.id, "Approved", req.currentUser.email);
+  setFlash(req, "success", "Hours approved.");
   res.redirect("/volunteers");
 }));
 
 app.post("/hours/:id/reject", requireAuth, requireRole("Project Manager", "Super Admin"), asyncRoute(async (req, res) => {
   await setHourStatus(req.params.id, "Rejected", req.currentUser.email);
+  setFlash(req, "success", "Hours rejected.");
   res.redirect("/volunteers");
 }));
 
@@ -2211,7 +2443,7 @@ const PROJECT_ROLES = ["Project Manager", "Super Admin"];
 
 app.get("/projects", requireAuth, requireRole(...PROJECT_ROLES), asyncRoute(async (req, res) => {
   const search = req.query.search ? String(req.query.search) : "";
-  res.type("html").send(projectListPage(req.currentUser, await listProjects(search), search));
+  res.type("html").send(projectListPage(req.currentUser, await listProjects(search), search, popFlash(req)));
 }));
 
 app.get("/projects/new", requireAuth, requireRole(...PROJECT_ROLES), (req, res) => {
@@ -2230,13 +2462,14 @@ app.post("/projects", requireAuth, requireRole(...PROJECT_ROLES), asyncRoute(asy
     return res.status(400).type("html").send(projectNewPage(req.currentUser, "Enter a project name, a valid status, progress between 0 and 100, and valid dates."));
   }
   const project = await createProject({ name, description, location, status, progress, startDate, endDate, createdBy: req.currentUser.id });
+  setFlash(req, "success", "Project created.");
   res.redirect(`/projects/${project.projectId}`);
 }));
 
 app.get("/projects/:id", requireAuth, requireRole(...PROJECT_ROLES), asyncRoute(async (req, res) => {
   const project = await findProjectById(req.params.id);
   if (!project) return res.status(404).type("html").send(errorPage("Not found", "This project doesn't exist.", req.currentUser));
-  res.type("html").send(projectDetailPage(req.currentUser, project, await listProjectUpdates(project.projectId)));
+  res.type("html").send(projectDetailPage(req.currentUser, project, await listProjectUpdates(project.projectId), popFlash(req)));
 }));
 
 app.post("/projects/:id/updates", requireAuth, requireRole(...PROJECT_ROLES), asyncRoute(async (req, res) => {
@@ -2247,6 +2480,9 @@ app.post("/projects/:id/updates", requireAuth, requireRole(...PROJECT_ROLES), as
   const status = String(req.body.status || "");
   if (note && Number.isInteger(progress) && progress >= 0 && progress <= 100 && PROJECT_STATUSES.includes(status)) {
     await addProjectUpdate(project.projectId, { note, progress, status, recordedBy: req.currentUser.email });
+    setFlash(req, "success", "Progress update saved.");
+  } else {
+    setFlash(req, "error", "Enter an update note, a valid status, and progress between 0 and 100.");
   }
   res.redirect(`/projects/${project.projectId}`);
 }));
@@ -2262,7 +2498,7 @@ const BENEFICIARY_ROLES = ["Project Manager", "Super Admin"];
 app.get("/beneficiaries", requireAuth, requireRole(...BENEFICIARY_ROLES), asyncRoute(async (req, res) => {
   const search = req.query.search ? String(req.query.search) : "";
   const beneficiaries = await listBeneficiaries(search);
-  res.type("html").send(beneficiariesListPage(req.currentUser, beneficiaries, search));
+  res.type("html").send(beneficiariesListPage(req.currentUser, beneficiaries, search, popFlash(req)));
 }));
 
 app.get("/beneficiaries/new", requireAuth, requireRole(...BENEFICIARY_ROLES), (req, res) => {
@@ -2294,6 +2530,7 @@ app.post("/beneficiaries", requireAuth, requireRole(...BENEFICIARY_ROLES), async
   const created = await createBeneficiary({
     fullName, uniqueGovHash, location, supportReceived, createdBy: req.currentUser.id,
   });
+  setFlash(req, "success", "Beneficiary created.");
   res.redirect(`/beneficiaries/${created.beneficiaryId}`);
 }));
 
@@ -2303,7 +2540,7 @@ app.get("/beneficiaries/:id", requireAuth, requireRole(...BENEFICIARY_ROLES), as
     return res.status(404).type("html").send(errorPage("Not found", "This beneficiary record doesn't exist.", req.currentUser));
   }
   const aidLog = await listAidForBeneficiary(req.params.id);
-  res.type("html").send(beneficiaryDetailPage(req.currentUser, beneficiary, aidLog));
+  res.type("html").send(beneficiaryDetailPage(req.currentUser, beneficiary, aidLog, popFlash(req)));
 }));
 
 app.post("/beneficiaries/:id/aid", requireAuth, requireRole(...BENEFICIARY_ROLES), asyncRoute(async (req, res) => {
@@ -2311,14 +2548,19 @@ app.post("/beneficiaries/:id/aid", requireAuth, requireRole(...BENEFICIARY_ROLES
   const aidType = String(req.body.aidType || "").trim();
   if (description) {
     await logAid(req.params.id, description, aidType, req.currentUser.email);
+    setFlash(req, "success", "Aid recorded.");
+  } else {
+    setFlash(req, "error", "Enter a description before recording aid.");
   }
   res.redirect(`/beneficiaries/${req.params.id}`);
 }));
 
-/* ---------- Donation Processing (role: Project Manager, Super Admin) ---------- */
+/* ---------- Donation Processing (role: Project Manager, Super Admin manage all;
+   Donor can self-report only their own) ---------- */
 /* Manual / Offline Record keeping — no payment gateway is integrated. Donors
-   can only ever see their own donations (see the /my-donations routes below);
-   public visitors never get a route into this data at all. */
+   can create and view only their own donations (see the /my-donations routes
+   below); public visitors never get a route into this data at all. Only
+   Project Manager / Super Admin can move a donation past "Pending". */
 
 const DONATION_ADMIN_ROLES = ["Project Manager", "Super Admin"];
 
@@ -2332,7 +2574,7 @@ app.get("/donations", requireAuth, requireRole(...DONATION_ADMIN_ROLES), asyncRo
     dateTo: req.query.dateTo ? String(req.query.dateTo) : "",
   };
   const [donations, stats] = await Promise.all([listDonations(filters), getDonationStats()]);
-  res.type("html").send(donationListPage(req.currentUser, donations, filters, stats));
+  res.type("html").send(donationListPage(req.currentUser, donations, filters, stats, popFlash(req)));
 }));
 
 app.get("/donations/new", requireAuth, requireRole(...DONATION_ADMIN_ROLES), (req, res) => {
@@ -2346,15 +2588,8 @@ app.post("/donations", requireAuth, requireRole(...DONATION_ADMIN_ROLES), asyncR
   const body = req.body || {};
   const donorName = String(body.donorName || "").trim();
   const donorEmail = String(body.donorEmail || "").trim();
-  const amount = Number(body.amount);
-  const currency = String(body.currency || "USD").trim().toUpperCase();
-  const donationDate = String(body.donationDate || "");
-  const paymentMethod = String(body.paymentMethod || "");
-  const purpose = String(body.purpose || "").trim() || "General Fund";
-  const referenceNumber = String(body.referenceNumber || "").trim();
   const internalNotes = String(body.internalNotes || "").trim();
-
-  const values = { donorName, donorEmail, amount: body.amount, currency, donationDate, paymentMethod, purpose, referenceNumber, internalNotes };
+  const values = { donorName, donorEmail, amount: body.amount, currency: body.currency, donationDate: body.donationDate, paymentMethod: body.paymentMethod, purpose: body.purpose, referenceNumber: body.referenceNumber, internalNotes };
 
   if (!donorName) {
     return res.status(400).type("html").send(donationNewPage(req.currentUser, "Enter the donor's name.", values));
@@ -2362,17 +2597,9 @@ app.post("/donations", requireAuth, requireRole(...DONATION_ADMIN_ROLES), asyncR
   if (!isValidEmail(donorEmail)) {
     return res.status(400).type("html").send(donationNewPage(req.currentUser, "Enter a valid donor email address.", values));
   }
-  if (!Number.isFinite(amount) || amount <= 0) {
-    return res.status(400).type("html").send(donationNewPage(req.currentUser, "Enter a donation amount greater than zero.", values));
-  }
-  if (!CURRENCIES.includes(currency)) {
-    return res.status(400).type("html").send(donationNewPage(req.currentUser, "Select a valid currency.", values));
-  }
-  if (!donationDate || Number.isNaN(Date.parse(donationDate))) {
-    return res.status(400).type("html").send(donationNewPage(req.currentUser, "Enter a valid donation date.", values));
-  }
-  if (!PAYMENT_METHODS.includes(paymentMethod)) {
-    return res.status(400).type("html").send(donationNewPage(req.currentUser, "Select a valid payment method.", values));
+  const parsed = validateDonationCore(body);
+  if (parsed.error) {
+    return res.status(400).type("html").send(donationNewPage(req.currentUser, parsed.error, values));
   }
 
   // Link the donation to a registered Donor account by email, when one exists,
@@ -2381,9 +2608,11 @@ app.post("/donations", requireAuth, requireRole(...DONATION_ADMIN_ROLES), asyncR
   const donorUserId = donorUser && donorUser.role === "Donor" ? donorUser.id : null;
 
   const created = await createDonation({
-    donorName, donorEmail, donorUserId, amount, currency, donationDate, paymentMethod,
-    purpose, referenceNumber, internalNotes, recordedBy: req.currentUser.email,
+    donorName, donorEmail, donorUserId,
+    amount: parsed.amount, currency: parsed.currency, donationDate: parsed.donationDate, paymentMethod: parsed.paymentMethod,
+    purpose: parsed.purpose, referenceNumber: parsed.referenceNumber, internalNotes, recordedBy: req.currentUser.email,
   });
+  setFlash(req, "success", "Donation recorded.");
   res.redirect(`/donations/${created.donationId}`);
 }));
 
@@ -2391,7 +2620,7 @@ app.get("/donations/:id", requireAuth, requireRole(...DONATION_ADMIN_ROLES), asy
   const donation = await findDonationById(req.params.id);
   if (!donation) return res.status(404).type("html").send(errorPage("Not found", "This donation record doesn't exist.", req.currentUser));
   const history = await listDonationStatusHistory(req.params.id);
-  res.type("html").send(donationDetailPage(req.currentUser, donation, history));
+  res.type("html").send(donationDetailPage(req.currentUser, donation, history, popFlash(req)));
 }));
 
 app.post("/donations/:id/status", requireAuth, requireRole(...DONATION_ADMIN_ROLES), asyncRoute(async (req, res) => {
@@ -2401,15 +2630,52 @@ app.post("/donations/:id/status", requireAuth, requireRole(...DONATION_ADMIN_ROL
   const note = String(req.body.note || "").trim();
   if (DONATION_STATUSES.includes(newStatus)) {
     await updateDonationStatus(req.params.id, newStatus, req.currentUser.email, note);
+    setFlash(req, "success", `Donation status updated to ${newStatus}.`);
+  } else {
+    setFlash(req, "error", "Select a valid status.");
   }
   res.redirect(`/donations/${req.params.id}`);
 }));
 
-/* ---------- Donor: "My Donations" (role: Donor only) ---------- */
+/* ---------- Donor: "My Donations" + self-service recording (role: Donor only) ---------- */
+/* A donor can record their own gift directly — still a Manual / Offline
+   Record, still starts 'Pending', and still requires a Project Manager or
+   Super Admin to confirm it as 'Received'. Donor identity is always taken
+   from the signed-in session, never from the submitted form, so a donor
+   can't attribute a donation to a different name or email. */
 
 app.get("/my-donations", requireAuth, requireRole("Donor"), asyncRoute(async (req, res) => {
   const donations = await listDonationsByEmail(req.currentUser.email);
-  res.type("html").send(myDonationsPage(req.currentUser, donations));
+  res.type("html").send(myDonationsPage(req.currentUser, donations, popFlash(req)));
+}));
+
+app.get("/my-donations/new", requireAuth, requireRole("Donor"), (req, res) => {
+  res.type("html").send(donationSelfNewPage(req.currentUser, null, {
+    currency: "USD",
+    donationDate: new Date().toISOString().slice(0, 10),
+  }));
+});
+
+app.post("/my-donations", requireAuth, requireRole("Donor"), asyncRoute(async (req, res) => {
+  const body = req.body || {};
+  const notes = String(body.notes || "").trim();
+  const values = { amount: body.amount, currency: body.currency, donationDate: body.donationDate, paymentMethod: body.paymentMethod, purpose: body.purpose, referenceNumber: body.referenceNumber, notes };
+
+  const parsed = validateDonationCore(body);
+  if (parsed.error) {
+    return res.status(400).type("html").send(donationSelfNewPage(req.currentUser, parsed.error, values));
+  }
+
+  const created = await createDonation({
+    donorName: req.currentUser.name,
+    donorEmail: req.currentUser.email,
+    donorUserId: req.currentUser.id,
+    amount: parsed.amount, currency: parsed.currency, donationDate: parsed.donationDate, paymentMethod: parsed.paymentMethod,
+    purpose: parsed.purpose, referenceNumber: parsed.referenceNumber, internalNotes: notes,
+    recordedBy: req.currentUser.email,
+  });
+  setFlash(req, "success", "Thanks! Your donation has been recorded and is pending confirmation by our team.");
+  res.redirect(`/my-donations/${created.donationId}`);
 }));
 
 app.get("/my-donations/:id", requireAuth, requireRole("Donor"), asyncRoute(async (req, res) => {
@@ -2417,7 +2683,7 @@ app.get("/my-donations/:id", requireAuth, requireRole("Donor"), asyncRoute(async
   if (!donation || donation.donorEmail.toLowerCase() !== req.currentUser.email.toLowerCase()) {
     return res.status(404).type("html").send(errorPage("Not found", "This donation record doesn't exist.", req.currentUser));
   }
-  res.type("html").send(donationReceiptPage(req.currentUser, donation));
+  res.type("html").send(donationReceiptPage(req.currentUser, donation, popFlash(req)));
 }));
 
 /* ---------- Error handler (catches anything asyncRoute forwarded) ---------- */

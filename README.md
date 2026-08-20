@@ -67,33 +67,58 @@ migration step. Then open **http://localhost:3000/login** (or `/register`).
 a project, `/projects/:id` for detail plus an append-only progress-update
 timeline (Project Manager, Super Admin only).
 
-**Donation Processing** — new this round. **Manual / Offline Record keeping
-only — no payment gateway is integrated.** Every donation is entered by
-staff after the money has already changed hands elsewhere (cash, bank
-transfer, cheque, mobile money, etc.); nothing on this platform charges a
-card or moves money.
+**Donation Processing** — **Manual / Offline Record keeping only — no payment
+gateway is integrated.** Every donation reflects money that already changed
+hands elsewhere (cash, bank transfer, cheque, mobile money, etc.); nothing on
+this platform charges a card or moves money.
 - `/donations` — dashboard + searchable, filterable list (Project Manager,
   Super Admin only). Shows real, database-driven totals: amount received
   (grouped by currency, never fabricated into a misleading single figure),
   pending count, distinct donor count, and recent donations. Filters by
   donor (name/email), status, payment method, purpose, and date range.
-- `/donations/new` — record a donation, with server-side validation
-  (positive amount, valid currency/payment-method/status allowlists, valid
-  email and date).
+- `/donations/new` — staff records a donation on a donor's behalf, with
+  server-side validation (positive amount, valid currency/payment-method
+  allowlists, valid email and date).
 - `/donations/:id` — full detail + a status-update form (Pending → Received
   → Refunded/Cancelled) that requires an in-page confirmation step before
   submitting, plus a complete audit trail of every status change
   (`donation_status_history`: old status, new status, who changed it, when,
   and an optional note).
-- `/my-donations` and `/my-donations/:id` — a signed-in **Donor** sees only
-  their own donations (matched by email, and linked to their account by
-  `donor_user_id` when a matching Donor account exists), rendered as a
-  simple receipt. Donors cannot see any other donor's records, and public
+- `/my-donations`, `/my-donations/new`, `/my-donations/:id` — a signed-in
+  **Donor** can both view their own donation history and **self-report a
+  donation they've already made** ("Record My Donation"). Self-reported
+  donations always start `Pending`; only a Project Manager/Super Admin can
+  move one to `Received`, exactly like a staff-entered donation. The
+  donor's name/email are always taken from their session — never from the
+  submitted form — so a donor cannot attribute a donation to a different
+  identity. Donors cannot see any other donor's records, and public
   visitors have no route into this data at all.
 - The public landing page does **not** have a "Donate Now" payment button,
-  because there is no payment gateway to back it yet — adding one would be
-  misleading. The old "Donation Processing — Coming Soon" tile has been
-  removed now that the module is real.
+  because there is no payment gateway to back it yet — it instead invites
+  visitors to register as a Donor and use the self-service recording flow.
+
+## UI / UX layer (applies to every authenticated page)
+
+- **Flash messages** — every create/update action (verify a volunteer,
+  approve/reject hours, log skills or hours, create a beneficiary, log aid,
+  create/update a project, record a donation, update a donation status,
+  self-report a donation) sets a one-shot success/error banner via
+  `setFlash()`/`popFlash()` (session-backed), shown at the top of the page
+  the user lands on after the redirect.
+- **Inline validation + loading state** — one shared script
+  (`FORM_UX_SCRIPT`, injected once by `appShell`) runs on every authenticated
+  page: it marks empty required fields the same way the login/register pages
+  do (red border, matching the design system) and disables/labels the submit
+  button while a POST is in flight — no per-form JavaScript needed.
+- **Responsive tables** — every table on every page collapses into stacked
+  cards below 700px instead of horizontally scrolling, using a CSS
+  `data-label` pattern (`pageHead()`/table cells carry `data-label`
+  attributes; no JS needed).
+- **Icon-led empty states and page headers** — `pageHead()` and `emptyRow()`
+  helpers give every page a consistent icon + title header and a friendly
+  icon-based empty state instead of plain gray text.
+
+
 
 ## Database schema
 
